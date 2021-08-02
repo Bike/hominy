@@ -309,6 +309,8 @@ Signals an error if the symbol is not bound in the environment."
     (map-into vals (lambda (form) (eval form new-env)) forms)
     (apply #'$sequence new-env body)))
 
+(defun exit () (throw 'abort (make-instance 'inert)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun kar (cons)
@@ -363,7 +365,8 @@ Signals an error if the symbol is not bound in the environment."
     (define (app (ign #'booleanp)) 'boolean? env)
     ;; control
     (define (op (simp #'$sequence)) '$sequence env)
-    (define (op (simp #'$let)) '$let env))
+    (define (op (simp #'$let)) '$let env)
+    (define (app (ign #'exit)) 'exit env))
   env)
 
 (defun install-reader-macros (&optional (readtable *readtable*))
@@ -379,5 +382,6 @@ Signals an error if the symbol is not bound in the environment."
          (repl-env (make-environment ground)))
     (initialize-ground ground)
     (install-reader-macros)
-    (loop (format t "~&> ")
-          (format t "~a~%" (eval (read) repl-env)))))
+    (catch 'abort
+      (loop (format t "~&> ")
+            (format t "~a~%" (eval (read) repl-env))))))
