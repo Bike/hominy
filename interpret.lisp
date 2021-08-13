@@ -204,6 +204,9 @@ Signals an error if the symbol is not bound in the environment."
                            (funcall cdr-augmenter (cdr combinand) vec))
                           (t (error "Not enough arguments"))))))))))
 
+;;; Returns a function that, given the dynamic environment and combinand passed
+;;; to an operative, returns a new augmentation of static-env with everything
+;;; in the plist and eparam bound. It sort of pre "compiles" a plist.
 (defun make-augmenter (static-env plist eparam)
   (etypecase eparam
     (ignore

@@ -126,55 +126,16 @@ would start with.
 Now lower stages can do things like figure out an efficient lookup and calling convention.
 |#
 
-;;; Given a plist, return two values: An argument plist, i.e. a plist of the
-;;; same shape but with arguments instead of symbols, and a list of all the
-;;; arguments thus made.
-(defun plist-to-arguments (plist)
-  (let ((arglist nil))
-    (labels ((aux (plist)
-               (etypecase plist
-                 (null plist)
-                 (symbol (let ((arg (make-instance 'argument :name plist)))
-                           (push arg arglist)
-                           arg))
-                 (cons (cons (aux (car plist)) (aux (cdr plist))))
-                 (ignore plist))))
-      (values (aux plist) (nreverse arglist)))))
-
-;;; TODO: generalize to variable plist, eparam, body
-(defun compile-to-ir (plist eparam body)
-  (multiple-value-bind (plist args) (plist-to-arguments plist)
-    (let* ((nameconsts (loop for arg in args
-                             collect (constant (name arg))))
-           (earg (if (ignorep eparam)
-                     eparam
-                     (make-instance 'argument :name eparam)))
-           (pre-augargs (loop for c in nameconsts for arg in args
-                              collect c collect arg))
-           (augargs (if (ignorep eparam)
-                        pre-augargs
-                        (list* (constant eparam) earg pre-augargs)))
-           (clos (make-instance 'enclosed :name '%closure-environment))
-           (rt (make-instance 'enclosed :name '%runtime))
-           (fun (make-instance 'cfunction :plist plist :arguments args
-                               :eargument earg :encloseds (list clos rt)))
-           (entry (make-instance 'cblock :cfunction fun :arguments ()))
-           (empty-env (constant (make-environment)))
-           (end (constant ()))
-           (for-effect (butlast body))
-           (final-form (car (last body)))
-           $augment %env $eval %result)
-      (setf (start fun) entry)
-      (build (entry)
-        (setf $augment (build-lookup (constant '$augment) rt))
-        (setf %env (build-combination $augment empty-env
-                                      end (list* clos augargs)))
-        (setf $eval (build-lookup (constant '$eval) rt))
-        (loop for form in for-effect
-              do (build-combination $eval empty-env
-                                    end (list (constant form) %env)))
-        (setf %result
-              (build-combination $eval empty-env
-                                 end (list (constant final-form) %env)))
-        (build-ret %result))
-      fun)))
+(defun fresh-function (&optional fname)
+  (burke/ir:assemble ((f fname) enclosed return)
+    (start (combinand.dynenv)
+     ()
+     (:= static-env (ir:car enclosed))
+     (:= t0 (ir:cdr enclosed))
+     (:= plist (ir:car t0))
+     (:= t1 (ir:cdr t0))
+     (:= eparam (ir:car t1))
+     (:= body (ir:cdr t1))
+     (:= aplist (ir:cons plist eparam))
+     (:= env (ir:augment static-env aplist combinand.dynenv))
+     (ir:sequence return body env))))

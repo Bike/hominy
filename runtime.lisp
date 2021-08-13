@@ -1,32 +1,34 @@
 (in-package #:burke)
 
-;;;; This file defines an environment and other things for use by
-;;;; compiler-generated code. It includes symbols useful for such code that
-;;;; aren't defined in other environments.
-;;;; In the future it would probably make sense to avoid consing up operatives
-;;;; etc. at all, since there's no way for user code to access them.
+;;;; This file defines stuff compiled code uses/depends on.
+;;;; It will get more complicated once representation selection allows
+;;;; non-stupid calling conventions, among other things.
 
 (defclass compiled-operative (operative)
   ((%fun :initarg :fun :reader compiled-operative-fun :type function)
-   (%enclosed :initarg :enclosed :reader enclosed :type list)))
+   (%enclosed :initarg :enclosed :reader enclosed)))
 
 (defmethod combine ((combiner compiled-operative) combinand env)
-  (multiple-value-call (compiled-operative-fun combiner)
-    (values-list (enclosed combiner))
-    env combinand))
+  (funcall (compiled-operative-fun combiner)
+           (enclosed combiner) (cons combinand dynenv)))
 
-(defun initialize-runtime (env)
-  (labels ((simp (f) (lambda (dynamic-env combinand)
-                       (apply f dynamic-env combinand)))
-           (ign (f) (lambda (dynamic-env combinand)
-                      (declare (cl:ignore dynamic-env))
-                      (apply f combinand)))
-           (op (f) (make-instance 'builtin-operative :fun f))
-           (app (f) (make-instance 'applicative :underlying (op f))))
-    (declare (cl:ignore #'simp #'app))
-    (define (op (ign #'eval)) '$eval env)
-    (define (op (ign #'combine)) '$combine env)
-    (define (op (ign #'augment)) '$augment env)
-    (define (op (ign #'car)) '$car env)
-    (define (op (ign #'cdr)) '$cdr env))
-  env)
+(defun caugment (env plist object)
+  (labels ((aux (plist object)
+             (etypecase plist
+               (ignore (values nil nil))
+               (null
+                (unless (null object) (error "too many arguments"))
+                (values nil nil))
+               (symbol (values (list plist) (list object)))
+               (cons
+                (unless (consp object) (error "not enough arguments"))
+                (multiple-value-bind (left-names left-values)
+                    (aux (car plist) (car object))
+                  (multiple-value-bind (right-names right-values)
+                      (aux (cdr plist) (cdr object))
+                    (values (append left-names right-names)
+                            (append left-values right-values))))))))
+    (multiple-value-call #'%augment env (aux plist object))))
+
+(defun enclose (fun enclosed)
+  (make-instance 'compiled-operative :fun fun :enclosed enclosed))
