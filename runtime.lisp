@@ -10,7 +10,7 @@
 
 (defmethod combine ((combiner compiled-operative) combinand env)
   (funcall (compiled-operative-fun combiner)
-           (enclosed combiner) (cons combinand dynenv)))
+           (enclosed combiner) (cons combinand env)))
 
 (defun caugment (env plist object)
   (labels ((aux (plist object)
