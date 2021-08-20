@@ -27,4 +27,6 @@
   ;; Copying
   (:export #:copy)
   ;; Assembly
-  (:export #:assemble-continuation #:assemble))
+  (:export #:assemble-continuation #:assemble)
+  ;; Verification
+  (:export #:verify))
