@@ -130,7 +130,7 @@
   (push use (%uinputs parameter)))
 
 ;;; The return continuation is somewhat magical, and some of these slots
-;;; will be unbound.
+;;; will be unbound. The parent will be the function's start continuation.
 (defclass continuation (datum)
   ((%parent :initarg :parent :accessor %parent
             :reader parent :type (or continuation function))

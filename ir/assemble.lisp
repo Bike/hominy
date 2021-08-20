@@ -119,5 +119,6 @@
                   (,name (make-instance 'function
                            :name ,nameform :enclosed ,ename :rcont ,rname))
                   (,gstart (assemble-continuation ,@cont)))
-             (setf (%parent ,gstart) ,name (%start ,name) ,gstart)
+             (setf (%parent ,gstart) ,name (%start ,name) ,gstart
+                   (%parent ,rname) ,gstart)
              ,name))))))
