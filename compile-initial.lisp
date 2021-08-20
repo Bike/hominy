@@ -126,6 +126,10 @@ would start with.
 Now lower stages can do things like figure out an efficient lookup and calling convention.
 |#
 
+;;; This is the initial function all user functions are derived from. It just
+;;; calls eval on its body, basically.
+;;; The enclosed data is (static-env plist eparam . body).
+
 (defun fresh-function (&optional fname)
   (burke/ir:assemble ((f fname) enclosed return)
     (start (combinand.dynenv)
