@@ -40,17 +40,18 @@
                                 (iname (or (fourth bind)
                                            `',(second bind))))
                             `(,name
-                              (build ,builder (make-bind ',(first form)
-                                                         ,iname
-                                                         ,@(rest form)))))
+                              (build ,builder (make-instruction
+                                               ',(first form) ,iname
+                                               ,@(rest form)))))
                 else
                   collect `(,(gensym "IGNORED")
                             (build ,builder (make-instruction ',(first bind)
+                                                              nil
                                                               ,@(rest bind))))))
         (term (first (last body))))
     `(let* (,@letbindings)
        (declare (ignorable ,@(mapcar #'first letbindings)))
-       (build ,builder (make-instruction ',(first term) ,@(rest term)))
+       (build ,builder (make-terminator ',(first term) nil ,@(rest term)))
        ,@extra)))
 
 (defun %namespec (namespec)

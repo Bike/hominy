@@ -12,7 +12,7 @@
     (unless (null new) (%add-use new use))))
 
 (defun %use-replacer (new) (lambda (use) (%replace-use use new)))
-(defun %deuse-inputs (inst) (map nil (%use-replacer nil) (%uinputs inst)))
+(defun %deuse-inputs (user) (map nil (%use-replacer nil) (%uinputs user)))
 
 ;;; Called automatically by %REMOVE-USE
 ;;; TODO: Warn about unused code etc. maybe?
@@ -36,6 +36,7 @@
 
 (defmethod %cleanup ((continuation continuation))
   (%remove-child (parent continuation) continuation)
+  (%deuse-inputs (parameter continuation))
   ;; Delete backwards to avoid tripping cleanup assertions.
   (let* ((term (terminator continuation)) (inst (%prev term)))
     (%delete-terminator term)
@@ -57,11 +58,13 @@
              (%cleanup cont)))
     (aux (start datum))))
 
+(defun replace-datum (new old) (%map-uses (%use-replacer new) old))
+
 (defun replace-terminator (new old)
   (%delete-terminator old)
-  (let ((cont (continuation old))) (setf (%terminator cont) new)))
-
-(defun replace-datum (new old) (%map-uses (%use-replacer new) old))
+  (let ((cont (continuation old)))
+    (setf (%terminator cont) new))
+  (replace-datum new old))
 
 (defgeneric insert-before (new instruction))
 (defmethod insert-before ((new bind) (inst instruction))

@@ -104,9 +104,30 @@
 
 (defclass value (datum) ()) ; first-class data
 
-(defclass parameter (value) ; parameter to a continuation
+(defclass user ()
+  (;; A sequence of USEs. NOTE that PARAMETER only actually needs a set, so
+   ;; maybe we should handle this more intelligently. INSTRUCTION does need an
+   ;; ordered sequence.
+   (%uinputs :initarg :uinputs :accessor %uinputs :type cl:sequence)))
+
+(defun map-inputs (function user)
+  (map nil (lambda (use) (funcall function (definition use)))
+       (%uinputs user))
+  (values))
+(defun inputs (user)
+  (loop for use in (%uinputs user) collect (definition use)))
+
+;;; Parameter to a continuation. Its inputs are the terminators that branch to
+;;; the continuation. A start continuation may have no inputs, meaning the
+;;; function parameter is used as the parameter to the continuation.
+;;; TODO: Represent that explicitly maybe?
+(defclass parameter (value user)
   ((%continuation :initarg :continuation :reader continuation
-                  :accessor %continuation :type continuation)))
+                  :accessor %continuation :type continuation)
+   (%uinputs :initform nil)))
+
+(defun %add-uinput (use parameter)
+  (push use (%uinputs parameter)))
 
 ;;; The return continuation is somewhat magical, and some of these slots
 ;;; will be unbound.
@@ -191,27 +212,18 @@
 (defun map-functions (function module)
   (map nil function (%functions module)))
 
-(defclass instruction ()
+(defclass instruction (value user)
   (;; The continuation this instruction is a part of.
    (%continuation :initarg :continuation :initform nil :accessor %continuation
                   :reader continuation :type (or null continuation))
    ;; The immediate predecessor of this instruction, or nil if this is the
    ;; first instruction of the continuation
    (%prev :initarg :prev :initform nil :accessor %prev
-          :reader prev :type (or null bind))
-   ;; A sequence of USEs
-   (%uinputs :initarg :uinputs :accessor %uinputs :type cl:sequence)))
-
-(defun map-inputs (function instruction)
-  (map nil (lambda (use) (funcall function (definition use)))
-       (%uinputs instruction))
-  (values))
-(defun inputs (instruction)
-  (loop for use in (%uinputs instruction) collect (definition use)))
+          :reader prev :type (or null bind))))
 
 (defmethod function ((o instruction)) (function (continuation o)))
 
-(defclass bind (instruction value)
+(defclass bind (instruction)
   ((%next :initarg :next :initform nil :accessor %next
           :reader next :type (or null instruction))))
 
@@ -244,6 +256,7 @@
 (defclass enclose (bind) ()) ; inputs: function, enclosed
 (defclass augment (bind) ()) ; inputs: env, plist, combinand
 
+;;; NOTE: All terminators have their destination as first operand.
 ;; inputs: continuation, combiner, combinand, dynenv
 (defclass combination (terminator) ())
 ;; inputs: continuation, combiner, enclosed, combinand, dynenv
@@ -273,7 +286,9 @@
   (defreads combination destination combiner combinand dynamic-environment)
   (defreads local-combination
     destination combiner enclosed combinand dynamic-environment)
-  (defreads continue destination argument))
+  (defreads continue destination argument)
+  (defreads eval destination form env)
+  (defreads sequence destination forms env))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -287,31 +302,13 @@
     (%add-use def use)
     use))
 
-(defun make-instruction (class &rest inputs)
-  (let* ((uses (mapcar #'%make-use inputs))
-         (inst (make-instance class :uinputs uses)))
-    (dolist (use uses) (setf (%user use) inst))
-    inst))
-;; take advantage of lisp optimizations on (make-instance CONSTANT ...)
-(define-compiler-macro make-instruction (class &rest inputs)
-  (let ((gclass (gensym "CLASS")) (ginst (gensym "INSTRUCTION"))
-        (guses (loop repeat (length inputs) collect (gensym "USE"))))
-    `(let* ((,gclass ,class) ; evaluate first - real pedantry hours
-            ,@(loop for guse in guses for inpf in inputs
-                    collect `(,guse (%make-use ,inpf)))
-            (,ginst (make-instance ,gclass :uinputs (list ,@guses))))
-       (setf ,@(loop for guse in guses
-                     for inpf in inputs
-                     append `((%user ,guse) ,ginst)))
-       ,ginst)))
-
-;;; Like MAKE-INSTRUCTION, but accepts a name for the binding.
-(defun make-bind (class name &rest inputs)
+(defun make-instruction (class name &rest inputs)
   (let* ((uses (mapcar #'%make-use inputs))
          (inst (make-instance class :name name :uinputs uses)))
     (dolist (use uses) (setf (%user use) inst))
     inst))
-(define-compiler-macro make-bind (class name &rest inputs)
+;; take advantage of lisp optimizations on (make-instance CONSTANT ...)
+(define-compiler-macro make-instruction (class name &rest inputs)
   (let ((gclass (gensym "CLASS")) (ginst (gensym "INSTRUCTION"))
         (guses (loop repeat (length inputs) collect (gensym "USE"))))
     `(let* ((,gclass ,class)
@@ -321,4 +318,34 @@
                       :name ,name :uinputs (list ,@guses))))
        (setf ,@(loop for guse in guses
                      append `((%user ,guse) ,ginst)))
+       ,ginst)))
+
+;;; Like MAKE-INSTRUCTION, but adds the terminator as an input to the parameter
+;;; of the continuation it branches to. Actually with actual branch terminators
+;;; that's going to be more than one continuation/parameter. FIXME
+(defun make-terminator (class name &rest inputs)
+  (let* ((uses (mapcar #'%make-use inputs))
+         (inst (make-instance class :name name :uinputs uses))
+         (param (parameter (destination inst)))
+         (iuse (%make-use inst)))
+    (dolist (use uses) (setf (%user use) inst))
+    (setf (%user iuse) param)
+    (%add-uinput iuse param)
+    inst))
+(define-compiler-macro make-terminator (class name &rest inputs)
+  (let ((gclass (gensym "CLASS")) (ginst (gensym "INSTRUCTION"))
+        (guses (loop repeat (length inputs) collect (gensym "USE"))))
+    `(let* ((,gclass ,class)
+            ,@(loop for guse in guses for inpf in inputs
+                    collect `(,guse (%make-use ,inpf)))
+            (,ginst (make-instance ,gclass
+                      :name ,name :uinputs (list ,@guses)))
+            ;; All macro parameters have been evaluated, so we don't need to
+            ;; worry about hygeine.
+            (iuse (%make-use ,ginst))
+            (param (parameter (destination ,ginst))))
+       (setf ,@(loop for guse in guses
+                     append `((%user ,guse) ,ginst))
+             (%user iuse) param)
+       (%add-uinput ,ginst param)
        ,ginst)))
