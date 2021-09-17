@@ -257,9 +257,11 @@
 (defclass augment (bind) ()) ; inputs: env, plist, combinand
 
 ;;; NOTE: All terminators have their destination as first operand.
-;; inputs: continuation, combiner, combinand, dynenv
+;;; Also note that the dynenv of a combination is incorporated into the
+;;; argument for uniform treatment.
+;; inputs: continuation, combiner, argument
 (defclass combination (terminator) ())
-;; inputs: continuation, combiner, enclosed, combinand, dynenv
+;; inputs: continuation, combiner, enclosed, argument
 (defclass local-combination (terminator) ())
 (defclass eval (terminator) ()) ; continuation, form, env
 (defclass sequence (terminator) ()) ; continuation, forms, env
@@ -283,9 +285,8 @@
   (defreads cdr cons)
   (defreads enclose efunction enclosed)
 
-  (defreads combination destination combiner combinand dynamic-environment)
-  (defreads local-combination
-    destination combiner enclosed combinand dynamic-environment)
+  (defreads combination destination combiner argument)
+  (defreads local-combination destination combiner enclosed argument)
   (defreads continue destination argument)
   (defreads eval destination form env)
   (defreads sequence destination forms env))
