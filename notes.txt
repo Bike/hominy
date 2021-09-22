@@ -1,0 +1,270 @@
+eschewing macros in favor of inlining operators, as shutt conceives of things, has some interesting consequences. one is that optimization of many "macro forms" is, in concert with contification, loop unrolling.
+
+Consider ($cond ((null? bools #f) ((car bools) #t) (#f (apply or? (cdr bools))))). With inlining, this gets us an operator that uses $cond recursively, but with contification,
+($letrec (($cond ($vau clauses env
+                   ($if (null? clauses)
+                        #inert
+                        ($let ((((test . body) . clauses) clauses))
+                          ($if (eval test env)
+                               (combine $sequence body env)
+                               (combine $cond clauses env)))))))
+  ($cond ((null? bools #f) ((car bools) #t) (#f (apply or? (cdr bools))))))
+
+[roughly] Obviously $cond is tail recursive here - a loop. We can determine (with more difficulty - not actually sure how) that the loop is necessarily finite if clauses is finite, and so can be completely unrolled.
+
+Of course the problem is that doing this for every use of a cond is a pretty insane amount of effort, so more specific rewriters would probably still be the way to go practically speaking. Perhaps best of all would be a compiler that can partial evaluate ahead of time - i.e. work out the loop and precompute how conds should be expanded - but that would be pretty damn smart.
+
+Still, even with a rewriter, it would be good for it to work partially. That is, (combine $cond (list* '(condition body) variable) env) could still be expanded to ($if condition body (combine $cond variable env)). That would be pretty impressive but I think doable. One of the big ways this compiler will be cool if it works will be working as an extremely aggressive partial evaluator and this is a good demonstration of what that could mean.
+
+---
+
+on that note - circular types are a worry - we don't want $cond on a circular list to hang the compiler as it keeps expanding indefinitely. I think a sufficient preventative measure would be to ban circular types, or at least specifically distinguish them with a mu type. Knowing that the clauses are (cons 'constant circular-list) is ok and we can reasonably expand out the constant, we just need to know when to stop.
+
+---
+
+I've been worried about environments, but I think rather than rewriting calls like I've imagined, a later representation selection step could do the work. Why separate out the variables if practically speaking they could be represented as a closure vector anyway? And if an environment is only ever used for lookups with constant names, well, the representation can be pretty damn simple indeed.
+
+Say we have
+
+($lambda (a b)
+  (f ($lambda () a))
+  (g ($lambda () b)))
+
+where f and g are known to ignore the dynamic environment (this part may still be tricky). Under the hood this means a new environment is constructed with bindings for A and B, and the functions close over it, but it's only ever used for constant symbols. Then the environment can be represented as (values a b). The encloses can just grab the value they need. The actual names can be dropped. With (fixed) mutable environments this works out the same but you have cells instead of values bound.
+
+---
+
+Having every call/evaluation forcibly be a terminator is something that I'm hoping should mean blocks/continuations never need to be split, which has been a point of confusion in Cleavir sometimes. E.g. if we have (combine $if ...) and want to inline it into an actual branch, we don't need to make a new branch for the after-the-if - it's already there. On the negative side it means there's a whole fucking lot of continuations.
+
+---
+
+way back when the esolang irc was complaining that wrap could be defined as a derived operator via
+
+($define! wrap ($lambda (operative)
+                 ($vau args env
+                   (combine operative (evlis args env)))))
+
+(essentially). It's true that this is possible, but then unwrap is not, and unwrap is useful both semantically and practically for the compiler. Similarly, it may be desirable to make combine a generic function even though the combiner can do almost anything, in order to accomodate other accessors; e.g. a $macro would probably want an EXPANDER accessor
+
+In Kernel terms:
+
+($define! ($macro macro? expander)
+  ($let (((%make-macro macro? expander) (make-encapsulation-type)))
+    (list ($vau vauargs env (%make-macro (combine $vau vauargs env)))
+          macro? expander)))
+
+($defmethod! combine (macro? any? any?)
+  ($vau (macro combinand env) #ignore
+    (eval (combine (expander macro) combinand env) env)))
+
+and
+
+($define! (wrap applicative? unwrap) (make-encapsulation-type))
+($defmethod! combine (applicative? any? any?)
+  ($vau (applicative combinand env) #ignore
+    (combine (unwrap applicative) (evlis combinand env) env)))
+
+---
+
+The treatment of dynamic environments to applicatives is somewhat inconsistent. MAP and REDUCE use the current dynamic environment. APPLY and FILTER use an empty one, and the latter has to construct a new empty on every time. The stated justification for FILTER doing so when MAP doesn't is that there's no form equivalent to filter to expand to which seems... pretty weak, and also incorrect, since you could define e.g. (filter f (list a...z)) = (append (if (f a) (list a))...)
+
+Having MAP call things in the present dynamic environment causes hygiene problems. Any combiner that calls MAP on an untrusted combiner (e.g. an argument) exposes its internal variable bindings etc. to that combiner. The derivation of REDUCE has to do some shenanigans to avoid this - it MAPs with a fresh applicative that ignores the dynamic environment and instead calls the given applicative in a different environment.
+
+I was thinking for a bit that applicatives reading the dynamic environment could be used for CL dynamic variables, but I'm seeing problems with that now. Kernel's solution, keyed dynamic variables, associates dynamic variables with the continuation rather than the environment at all, which I think matches exactly CL's "dynamic environment". It's probably a better way to go. And top of that, I think MAP and REDUCE and etc should call things in an empty or even unspecified dynamic environment.
+
+---
+
+Dynamic binding could be written in a Schemelike with the following equivalence
+(let ((*binding* value)) form)
+= (let ((old *binding*) (new value))
+    (dynamic-wind (lambda () (set! *binding* new))
+                  (lambda () form)
+                  (lambda () (set! *binding* old))))
+
+assuming old and new are gensyms and *binding* returns an unboundedness marker rather than erroring if unbound. The point here is just that the value is only evaluated once, but still reinstalled if the form's continuation is reentered.
+
+($define! make-keyed-dynamic-variable
+  (wrap
+   ($vau () #ignore
+     ($let* ((cellcell (list ()))
+             (bind
+               ($let ((thunk ($lambda ()
+                               (combine combiner () (make-environment)))))
+                 ($lambda (new-value combiner)
+                   ($let ((cell (car cellcell)))
+                     ($if (cons? cell) ; we're shadowing
+                          ($let ((old-value (car cell)))
+                            (dynamic-wind
+                             ($lambda () (set-car! cell new-value))
+                             thunk
+                             ($lambda () (set-car! cell old-value))))
+                          (dynamic-wind ($lambda ()
+                                          (set-car! cellcell (list new-value)))
+                                        thunk
+                                        ($lambda ()
+                                          (set-car! cellcell ()))))))))
+             (boundp ($lambda () (cons? (car cellcell))))
+             (read ($lambda ()
+                     ($if (boundp)
+                          (car (car cellcell))
+                          (error ...)))))
+       (list bind read)))))
+
+---
+
+Symbol macros
+
+Kernel has some pretty good arguments against macros, but something _like_ symbol macros is very useful in practical programming. I think the following admittedly somewhat radical change to the evaluator would suffice:
+
+An environment maps symbols to symbol combiners. A symbol combiner is a combiner that accepts an empty combinand. The evaluator works as follows:
+
+2. If [the evaluated object] o is a symbol, the evaluator combines the combiner with an empty combinand in [the environment] e, and returns the result.
+
+The symbol combiner can be retrieved with (symbol-combiner symbol environment).
+
+($symbolic-let (symbol combiner)* body) creates a new environment with the symbols given those combiners.
+
+$vau binds its names to operatives with empty parameters that ignore the dynamic environment and have no visible side effects that return the value bound. All other Kernel-standard bindings go through $vau, so $symbol-let is the only way to bind these things.
+
+---
+
+High level interface
+
+Doc Shutt basically conflates environments with modules, and I think that's a good idea. His conception of this is side-effect and to some extent file based, which I think is not.
+
+Imagine an operator $module
+($module exports . bindings)
+= `($letrec ,bindings ($bindings->environment ,@(map ($lambda (x) (list x x))
+                                                     exports)))
+
+($define! $module
+  ($vau (exports . bindings) dynenv
+    (eval (list $letrec bindings
+                (list* $bindings->environment
+                       (map ($lambda (x) (list x x)) exports)))
+          dynenv)))
+
+It establishes some bindings that can refer to each other, then returns an environment consisting of only the specified bindings. This is a simple module mechanism: The $letrec bindings allow any number of internal bindings to be established, and they are evaluated in the current dynamic environment; then a new environment is constructed with only the bindings that form the interface of the module.
+
+As a silly example, say we wanted to define map in terms of a map1. We could do
+
+($module (map)
+  (call ($lambda (app . args) (apply app args))) ; force applicative
+  (map1 ($lambda (app list)
+          ($if (null? list)
+               list
+               (cons (call app (car list)) (map1 app (cdr list))))))
+  (map
+    ($lambda (app . lists)
+      ($if (apply or? (map1 null? lists))
+           ()
+           (cons (apply app (map1 car lists))
+                 (apply map (list* app (map1 cdr lists))))))))
+
+This returns an environment that has MAP, and _only_ MAP, bound in it. CALL and MAP1 are totally internal.
+
+We can compose these modules together using make-environment. For example we could do (make-environment ($module (map) ...) stdenv) and get an environment where MAP is bound as we want and all the other standard operators are available. (For a bit I was thinking it might be good to specify the parents of the new environment, but multiple inheritance of environments makes this pointless - depth first search means it's impossible to distinguish this from specifying parents, and this is easier.)
+
+More generally we might want to specify the environment that the module's definitions are evaluated in:
+
+($define! $module-redirect
+  ($vau (env exports . bindings) dynenv
+    (eval (list $letrec bindings
+                (list* $bindings->environment
+                       (map ($lambda (x) (list x x)) exports)))
+          (eval env dynenv))))
+
+(and again analogously to Kernel's $let- family, ($module-safe exports . bindings) = ($module-redirect (make-kernel-standard-environment) exports . bindings).)
+
+Hey I just noticed the equivalency for $bindings->environment is incorrect - get-current-environment won't be bound in (make-environment) unless the bindings happen to have it. The actual definition works though.
+
+OK that all has nothing to do with compilation, but bear with me. In the rationale for get-module (not my favorite design but w/e), Shutt mentions
+
+> There is room, within the functionality of applicative get-module, for a sort of “compilation”, in which a source file has associated with it preprocessed information about how to rapidly construct an appropriate environment for return by get-module.
+
+Broadening this and removing the side effect based description: Compilation is taking a module (environment) and returning something more efficient - to construct, to run, whatever. I agree. Serialization to a file can be accomplished with a separate function. Then our interface could be
+
+(compile-environment <environment>) => environment. Return a new environment that is operationally identical (but not necessarily eq?) to the input, but which has been optimized.
+(serialize-environment <environment> <port>) => #inert. Output a description of the environment to the port. The format is implementation-dependent.
+(deserialize-environment <port>) => environment. Read a serialized description of an environment from the port, construct it, and return it. This description must have been produced by a call to SERIALIZE-ENVIRONMENT by the same implementation.
+
+Might require some more thought about I/O formats like whether it's a character port or binary or what. Whatever.
+
+Also a module might MIGHT want to have side effects on load, like an initialization function or main function, but I'm going to say that that's out of scope for what I'm talking about. You could implement it by e.g. defining that the load routine checks for a symbol named init and if it exists combines it with nil.
+
+Anyway. compile-environment is okay for what it is but there is a flaw: We have to actually evaluate the code describing an environment to compile it. This is unfortunate if for example some bindings are to forms with side effects, or just if we are running offline and don't care to go through the effort and memory to construct an interpreted version we won't be using.
+
+So introduce a new type predicated on environment-description? with some of the following operations:
+($cmodule exports . bindings) => environment description. Like $module but produces an environment-description.
+($cmodule-redirect env exports . bindings) => envdesc. Like $module-redirect but etc
+($cmodule-safe ...) bla bla bla
+(load-description envdesc) => environment.
+(environment->description environment => envdesc.
+And say that serialize and deserialize work on descriptions rather than environments, or have different behavior for them I guess.
+
+Next problem: We might want to specify a description for the remote environment. This would be the case if we want to build (offline) a complex system with multiple modules that are dependent on one another. Okay, no problem, have $cmodule-redirect take a description instead of an environment, and add an operator analogous to make-environment for descriptions so that they can be composed.
+
+We may also want to make definitions available to the compiler but not have them be in the eventual environment. For example we could have a module with macro-like operators that are intended to be optimized away by the compiler, or just inline definitions. ...but this actually isn't a problem with the above change; we can just specify these in the description passed to $cmodule-redirect, and never actually realize that description, so it's effectively a "compiler environment".
+
+We want to be able to loosen restrictions even further. Actually, do we? Can not the compiler just decide whether it wants to keep a full inline definition or just type information? Possibly with hints from the user contributing to this decision.
+
+I think we might. Compiling with respect to non-definitions means compiling with respect to an interface. This would allow the internals of the interface to be changed without requiring code using that interface to be recompiled.
+
+How about unknown bindings? That would be good for describing a REPL environment or something - just like a note that maybe there will be more bindings later.
+
+Okay, so say we have a more general notion of environment description. Every symbol that will be bound in the environment is associated with an "info". The "info" contains information about the object that will be bound to that symbol.
+
+Types of infos could include:
+
+* The actual form that will (at least theoretically) be evaluated to produce the object. This is the only kind of "info" produced by the previous $cmodule. It would be good for definitions that are expected to be inlined.
+* A partial form, or type of the form? Maybe?
+* A type of the object
+* Information on how to rewrite combinations of the (combiner) object
+* An indicator that uses of the symbol should always be optimized away, and that if they aren't the compiler should signal a warning and the evaluator should signal an error (e.g. for "macros" and/or constants)
+* More than one of the above
+
+This all suggests a multi-phase compilation process:
+
+1. First, a description is produced. This has zero+ parent descriptions, zero+ bindings, zero+ exports.
+2. Actual forms for that description are compiled "in" that description. This results in a compiled module.
+3. The compiled module is loaded (making it a regular environment) or serialized to a port or whatever.
+
+If an environment A is compiled w/r/t a description B and serialized, it must be deserialized in an environment similar to B. Relatedly: deserialize needs an environment parameter
+
+Imagine if we want to target a runtime where eval and map will not be available. We would still be able to use constructs like $let that indirectly rely on them. We can construct a description that includes the standard info for $let, augmented with a tag saying that at runtime it will be an error/undefined to use it. A $let which refers to map may be available to the compiler even if it is not available to the runtime. Map needs to be available to the compiler for this. The tag acts as a weird shadow: "this thing may not be bound at runtime".
+
+Could we even say that it will be bound to something else at runtime? This would be too chaotic I think. But, in this example, we _could_ have a description with $let having its normal meaning but marked as unreal, and map having some other meaning entirely, and expect things to work - for the basic lexical scoping reason that $let is defined in terms of the standard map it closed over, not the one that will be bound. Or we could even have $let available but map not, and expect runtime $let to work. The description promises that $let is bound and that must be honored. Practically speaking map probably would be bound in that case.
+
+Something I need to remember is that the description is separate from the actual code in the module. The description says: the module can be compiled and assume that it will be loaded into the environment described. It is not itself the module, though it may have parts of it for inline definitions etc. So it doesn't make sense so much to think of how a standard environment would be dumpable - the implementation may provide a description of it and that would be conceptually distinct from the actual source of the standard library.
+
+Probably do need to be careful that an expander doesn't output calls to something the environment doesn't have.
+
+DO we want to worry about non-constant symbols? I think I don't care and in any case the above is quite enough to implement to start with.
+
+On top of the above abstractions there should be simple syntax for writing things out in files like usual, and getting an implied description from actual code. Like so you just write a definition and expect it to be available to the inliner. Anyway.
+
+I'm going to worry about a full API later. The salient point is that whole modules should be compiled at once. Something like cl:compile that does a single function is easy to derive from that.
+
+Problems remaining: 1) everything has to be constructed at once
+
+---
+
+terminators should be values since they're the input to continuations. think about best rep here.
+
+augment should be split intwo. first part takes the plist, second the value. this facilitates letrec.
+
+---
+
+More on the "eval lifting" i shittily invented in the `$cond` example above. Say we have `($vau (... form env ...) ... ($vau ... (eval form env)))`. This is a redex and the rewrite is `($vau (... form env ...) ... ($let ((f (eval (list $vau () #ignore form) env))) ($vau ... (f))))`. Phrased this way it should almost always be a win, except that creating the operative may cons and the inner operative closing over it may cons. If the eval is rewritten more cleverly to compile, and the compiler is slow, it starts mattering how many times the inner (non-evaled) operator is combined, but with this phrasing that can be a separate optimization decision.
+
+One time it's not a win is when the operator consists entirely of an evaluation... but thinking about it, can't that be fixed by eta reduction? e.g. we have `($vau () #ignore (eval form env))`, rewrite as `($let ((f (eval (list $vau () #ignore form) env))) ($vau () #ignore (f)))`, then eta to get `(eval (list $vau () #ignore form) env)`.
+
+Some variations. A form/env passed as parameters can also be lifted, i.e. replacing `($vau (form env) ...)` with `($vau (thunk) ...)` and etc.
+
+A combination or $sequence or whatever else can be moved out just the same as an eval. For a combination we probably don't want to bother unless we don't know the combiner is an applicative.
+
+The environment being partially known is not a problem. Say we have `($vau (x y) (eval form (get-current-environment)))`. We can statically determine the "shape" of the current environment to have x, y, and whatever is in force outside the operator, and rewrite as `($let ((f (eval (list $lambda '(z w) form) (get-current-environment)))) ($vau (x y) (f x y)))`. (And then eta reduce probably.)
+
+---
+
+Eta reduction might be slightly trickier with operatives. `($vau x e (combine f x e))` is just `f`, no problem there. Think that works regardless of how wrapped f is, since the operative doesn't evaluate anything. But `($vau (x) #ignore (f x))` is not `f`. The dumb reason is that maybe `f` accepts more than one argument, but the environment reason is that `f` could read the dynamic environment of the call, where `x` is bound. We also have to know that `f` ignores its environment.
