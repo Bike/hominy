@@ -2,15 +2,28 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
+;;; properties of instructions
+;;; each property has an associated mixin for convenience
+;;;
+
+(defmacro defproperty (mixin predicate)
+  `(progn
+     (defclass ,mixin (instruction) ())
+     (defmethod ,predicate ((inst ,mixin)) t)))
+
+(defproperty flushable flushablep)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
 ;;; particular instructions
 ;;;
 
-(defclass lookup (bind) ()) ; inputs: symbol environment
-(defclass cons (bind) ()) ; inputs: car cdr
-(defclass car (bind) ()) ; inputs: cons
-(defclass cdr (bind) ()) ; inputs: cons
-(defclass enclose (bind) ()) ; inputs: function, enclosed
-(defclass augment (bind) ()) ; inputs: env, plist, combinand
+(defclass lookup (flushable bind) ()) ; inputs: symbol environment
+(defclass cons (flushable bind) ()) ; inputs: car cdr
+(defclass car (flushable bind) ()) ; inputs: cons
+(defclass cdr (flushable bind) ()) ; inputs: cons
+(defclass enclose (flushable bind) ()) ; inputs: function, enclosed
+(defclass augment (flushable bind) ()) ; inputs: env, plist, combinand
 
 ;;; NOTE: All terminators have their destination as first operand.
 ;;; Also note that the dynenv of a combination is incorporated into the

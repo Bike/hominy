@@ -92,9 +92,15 @@
     (write (name o) :stream s))
   o)
 
+;; Can we delete this if its value is unused?
+(defgeneric flushablep (datum))
+;; everything but instructions is flushable
+(defmethod flushablep ((datum datum)) t)
+
 (defun %add-use (datum use) (push use (%uses datum)))
 (defun %remove-use (datum use)
-  (when (null (setf (%uses datum) (delete use (%uses datum))))
+  (when (and (null (setf (%uses datum) (delete use (%uses datum))))
+             (flushablep datum))
     ;; No more uses: delete this datum
     (%cleanup datum)))
 (defun %map-uses (function datum) (mapc function (%uses datum)) (values))
@@ -222,6 +228,9 @@
           :reader prev :type (or null bind))))
 
 (defmethod function ((o instruction)) (function (continuation o)))
+
+;; only some instructions are flushable; see instructions.lisp for defs
+(defmethod flushablep ((d instruction)) nil)
 
 (defclass bind (instruction)
   ((%next :initarg :next :initform nil :accessor %next
