@@ -29,7 +29,7 @@
   (make-instance 'function :name (name old)))
 (defmethod %initialize-copy progn ((old function) (new function) table)
   (setf (%module new) (%copy (%module old) table)
-        (%root new) (%copy (%root old) table)
+        (%rcont new) (%copy (%rcont old) table)
         (%enclosed new) (%copy (%enclosed old) table)
         (%start new) (%copy (%start old) table)))
 
@@ -54,13 +54,11 @@
 (defmethod %allocate-copy ((old continuation))
   (make-instance 'continuation :name (name old)))
 (defmethod %initialize-copy progn ((old continuation) (new continuation) table)
-  (setf (%function new) (%copy (%function old) table)
-        (%parent new) (%copy (%parent old) table))
+  (setf (%parent new) (%copy (%parent old) table))
   (map-children (lambda (ch) (add-child new (%copy ch table))) old)
-  (unless (root-continuation-p new) ; fields won't be initialized in roots
-    (setf (%parameter new) (%copy (%parameter old) table)
-          (%start new) (%copy (%start old) table)
-          (%terminator new) (%copy (%terminator old) table))))
+  (setf (%parameter new) (%copy (%parameter old) table)
+        (%start new) (%copy (%start old) table)
+        (%terminator new) (%copy (%terminator old) table)))
 
 (defmethod %allocate-copy ((old instruction))
   (make-instance (class-of old) :name (name old)))
