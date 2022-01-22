@@ -355,7 +355,7 @@ Signals an error if the symbol is not bound in the environment."
     (define (app (ign #'unwrap)) 'unwrap env)
     ;; lists
     (define (app (ign #'cons)) 'cons env)
-    (define (app (ign #'kar)) 'car env) ; incorrect, CL:CAR works on nil
+    (define (app (ign #'kar)) 'car env)
     (define (app (ign #'kdr)) 'cdr env)
     (define (app (ign #'consp)) 'cons? env) ; "pair?" in kernel
     (define (app (ign #'null)) 'null? env)
