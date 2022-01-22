@@ -9,7 +9,6 @@
 (defclass type () ())
 
 (defgeneric subtypep (type1 type2))
-;; TODO
 (defgeneric conjoin/2 (type1 type2))
 (defgeneric disjoin/2 (type1 type2))
 
@@ -18,12 +17,38 @@
 (defclass bot (type) ())
 (defun bot () (make-instance 'bot))
 
+(defun conjoin (&rest types)
+  (cond ((null types) (top))
+        ((null (rest types)) (first types))
+        (t (reduce #'conjoin/2 types))))
+(define-compiler-macro conjoin (&rest types)
+  (cond ((null types) `(top))
+        ((null (rest types)) `(the type ,(first types))) ; avoid toplevel
+        (t `(conjoin/2 ,(first types) (conjoin ,@(rest types))))))
+(defun disjoin (&rest types)
+  (cond ((null types) (bot))
+        ((null (rest types)) (first types))
+        (t (reduce #'disjoin/2 types))))
+(define-compiler-macro disjoin (&rest types)
+  (cond ((null types) `(bot))
+        ((null (rest types)) `(the type ,(first types)))
+        (t `(disjoin/2 ,(first types) (disjoin ,@(rest types))))))
+
 (defmethod subtypep ((t1 type) (t2 top)) t)
 (defmethod subtypep ((t1 top) (t2 top)) t)
 (defmethod subtypep ((t1 top) (t2 type)) nil)
 (defmethod subtypep ((t1 bot) (t2 type)) t)
 (defmethod subtypep ((t1 bot) (t2 bot)) t)
 (defmethod subtypep ((t1 type) (t2 bot)) nil)
+
+(defmethod conjoin/2 ((t1 top) (t2 type)) t2)
+(defmethod conjoin/2 ((t1 type) (t2 top)) t1)
+(defmethod conjoin/2 ((t1 bot) (t2 type)) t1)
+(defmethod conjoin/2 ((t1 type) (t2 bot)) t2)
+(defmethod disjoin/2 ((t1 top) (t2 type)) t1)
+(defmethod disjoin/2 ((t1 type) (t2 top)) t2)
+(defmethod disjoin/2 ((t1 bot) (t2 type)) t2)
+(defmethod disjoin/2 ((t1 type) (t2 bot)) t1)
 
 (macrolet ((defsingle (name)
              `(progn

@@ -2,11 +2,12 @@
   (:use #:cl)
   (:shadow #:type #:null #:cons #:list
            #:subtypep #:car #:cdr #:ignore #:symbol)
+  (:shadow #:top #:bot)
   (:export #:type #:recur
            #:environment #:inert #:ignore #:symbol
            #:null #:cons #:car #:cdr #:list
            #:applicative #:operative)
-  (:export #:subtypep))
+  (:export #:subtypep #:conjoin #:disjoin))
 
 (defpackage #:burke
   (:use #:cl)
