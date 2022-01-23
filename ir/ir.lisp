@@ -5,25 +5,32 @@
 ;;;; jumping to a block, and parameters to the continuation are phi nodes; but
 ;;;; it should also help with reified continuations and stuff. But mostly I
 ;;;; want to see how it works.
-;;;; Here, a "continuation" is a sequence of bindings of temporary variables,
-;;;; or static single assignments if you like, ending with a "terminator". A
+;;;; Here, a "continuation" is basically a terminator and its inputs. A
 ;;;; terminator is either:
 ;;;; * (continue continuation arg) meaning to run that continuation.
-;;;; * (combine continuation combiner combinand dynenv) meaning to call that
-;;;;   combiner with that combinand and dynenv, and then passing the result to
-;;;;   the continuation.
+;;;; * (combine continuation combiner combinand) meaning to call that
+;;;;   combiner on that combinand, and then to pass the result to the
+;;;;   continuation.
 ;;;; * (eval continuation form env)
 ;;;; * (sequence continuation forms env) [= (combine $sequence forms env)]
 ;;;; * branches which I haven't elaborated on yet.
-;;;; Temporary variable bindings are to either
-;;;; * constants (maybe?)
+;;;; An input is either a constant, parameter, enclosed variable, function,
+;;;; continuation, or node.
+;;;; Nodes consist of computations that don't involve control flow - so either
+;;;; no computation at all, or side-effect-free ones. They can still be pretty
+;;;; involved, the details being left to the later code generation stages.
+;;;; Node computations do not have any order, which is fine since they're
+;;;; side-effect-free. They are even allowed to input to themselves or
+;;;; otherwise circularly, which should be good for circular lists and
+;;;; self-referencing closures.
+;;;; Possible nodes are:
 ;;;; * (lookup symbol env)
 ;;;; * (enclose FUNCTION value)
 ;;;; * (augment env plist object)
 ;;;; * (cons car cdr)
 ;;;; * (car cons)
 ;;;; * (cdr cons)
-;;;; Combinations are not allowed, so any combination terminates a continuation.
+;;;; Combinations are not inputs, so any combination terminates a continuation.
 ;;;; This is intentional; I'm hoping it will make inlining easier, since a
 ;;;; continuation never needs to be split.
 
@@ -68,7 +75,7 @@
 ;;;; The parameter is to the start continuation rather than the function in
 ;;;; hopes of supporting tail recursion.
 
-;;;; A function closes over a value. In general this value is
+;;;; A function closes over a value. Initially this value is
 ;;;; (lexenv plist eparam . body), as operatives may be constructed from
 ;;;; variable data rather than constants in the most general case,
 ;;;; e.g. from (combine $vau ...). This list is intended to be convenient to
@@ -92,17 +99,10 @@
     (write (name o) :stream s))
   o)
 
-;; Can we delete this if its value is unused?
-(defgeneric flushablep (datum))
-;; everything but instructions is flushable
-(defmethod flushablep ((datum datum)) t)
-
 (defun %add-use (datum use) (push use (%uses datum)))
-(defun %remove-use (datum use)
-  (when (and (null (setf (%uses datum) (delete use (%uses datum))))
-             (flushablep datum))
-    ;; No more uses: delete this datum
-    (%cleanup datum)))
+(defgeneric %remove-use (datum use))
+(defmethod %remove-use ((datum datum) use)
+  (setf (%uses datum) (delete use (%uses datum))))
 (defun %map-uses (function datum) (mapc function (%uses datum)) (values))
 
 (defun map-users (function datum)
@@ -137,6 +137,8 @@
 
 ;;; The return continuation is somewhat magical, and some of these slots
 ;;; will be unbound. The parent will be the function's start continuation.
+;;; Note that, as a datum, a continuation represents itself, not its output.
+;;; The output ends up as a parameter, if anything.
 (defclass continuation (datum)
   ((%parent :initarg :parent :accessor %parent
             :reader parent :type (or continuation function))
@@ -147,8 +149,6 @@
    (%exit-guard)
    (%parameter :initarg :parameter :accessor %parameter
                :reader parameter :type parameter)
-   (%start :initarg :start :initform nil :accessor %start
-           :reader start :type (or null instruction))
    (%terminator :initarg :terminator :initform nil :accessor %terminator
                 :reader terminator :type (or null terminator))))
 
@@ -159,20 +159,7 @@
         (function parent))))
 
 (defun builtp (continuation)
-  (and (not (null (start continuation)))
-       (not (null (terminator continuation)))))
-
-(defun map-binds (function continuation)
-  (let ((term (terminator continuation)))
-    (loop for i = (start continuation) then (next i)
-          until (eql i term)
-          do (funcall function i))))
-(defun map-instructions (function continuation)
-  (let ((term (terminator continuation)))
-    (loop for i = (start continuation) then (next i)
-          do (funcall function i)
-          until (eql i term))
-    (values)))
+  (and (not (null (terminator continuation)))))
 
 (defun add-child (continuation child) (push child (%children continuation)))
 (defun %remove-child (continuation child)
@@ -199,7 +186,9 @@
    (%enclosed :initarg :enclosed :accessor %enclosed
               :reader enclosed :type enclosed)
    (%start :initarg :start :accessor %start :reader start :type continuation)
-   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)))
+   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)
+   ;; A sequence (could be set) of constants in this function.
+   (%constants :initarg :constants :accessor %constants :type cl:sequence)))
 
 ;;; No add- etc since you should be adding to the parent.
 (defun map-continuations (f function)
@@ -218,23 +207,15 @@
 (defun map-functions (function module)
   (map nil function (%functions module)))
 
+;;; Shared superclass of nodes and terminators.
 (defclass instruction (value user)
   (;; The continuation this instruction is a part of.
    (%continuation :initarg :continuation :initform nil :accessor %continuation
-                  :reader continuation :type (or null continuation))
-   ;; The immediate predecessor of this instruction, or nil if this is the
-   ;; first instruction of the continuation
-   (%prev :initarg :prev :initform nil :accessor %prev
-          :reader prev :type (or null bind))))
+                  :reader continuation :type (or null continuation))))
 
 (defmethod function ((o instruction)) (function (continuation o)))
 
-;; only some instructions are flushable; see instructions.lisp for defs
-(defmethod flushablep ((d instruction)) nil)
-
-(defclass bind (instruction)
-  ((%next :initarg :next :initform nil :accessor %next
-          :reader next :type (or null instruction))))
+(defclass node (instruction) ())
 
 (defclass terminator (instruction) ())
 
@@ -246,10 +227,9 @@
    ;; Dataflow analysis should be able to get information specific to this
    ;; use and not the definition. Like the basic
    ;; (if (typep x 'foo) x #|wow it's a foo!!|# x #|but here it's not|#) stuff
-   (%type)
-   (%dx)))
+   (%type)))
 
-(defclass constant (value)
+(defclass constant (node)
   ((%value :initarg :value :reader value)))
 (defun constant (value) (make-instance 'constant :value value))
 
@@ -281,34 +261,4 @@
                       :name ,name :uinputs (list ,@guses))))
        (setf ,@(loop for guse in guses
                      append `((%user ,guse) ,ginst)))
-       ,ginst)))
-
-;;; Like MAKE-INSTRUCTION, but adds the terminator as an input to the parameter
-;;; of the continuation it branches to. Actually with actual branch terminators
-;;; that's going to be more than one continuation/parameter. FIXME
-(defun make-terminator (class name &rest inputs)
-  (let* ((uses (mapcar #'%make-use inputs))
-         (inst (make-instance class :name name :uinputs uses))
-         (param (parameter (destination inst)))
-         (iuse (%make-use inst)))
-    (dolist (use uses) (setf (%user use) inst))
-    (setf (%user iuse) param)
-    (%add-uinput iuse param)
-    inst))
-(define-compiler-macro make-terminator (class name &rest inputs)
-  (let ((gclass (gensym "CLASS")) (ginst (gensym "INSTRUCTION"))
-        (guses (loop repeat (length inputs) collect (gensym "USE"))))
-    `(let* ((,gclass ,class)
-            ,@(loop for guse in guses for inpf in inputs
-                    collect `(,guse (%make-use ,inpf)))
-            (,ginst (make-instance ,gclass
-                      :name ,name :uinputs (list ,@guses)))
-            ;; All macro parameters have been evaluated, so we don't need to
-            ;; worry about hygeine.
-            (iuse (%make-use ,ginst))
-            (param (parameter (destination ,ginst))))
-       (setf ,@(loop for guse in guses
-                     append `((%user ,guse) ,ginst))
-             (%user iuse) param)
-       (%add-uinput ,ginst param)
        ,ginst)))

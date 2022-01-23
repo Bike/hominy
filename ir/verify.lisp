@@ -42,6 +42,7 @@
         (test (member ir (children parent)) ir
               "parent ~a does not list it as a child" parent)))
     (verify (parameter ir))
+    #+(or) ; FIXME
     (map-instructions #'verify ir)
     (map-children #'verify ir)))
 
@@ -79,23 +80,6 @@
 
 (defmethod verify progn ((ir module))
   (map-functions #'verify ir))
-
-(defmethod verify progn ((ir instruction))
-  (let ((prev (prev ir)))
-    (cond (prev
-           (test (eql (continuation ir) (continuation (prev ir))) ir
-                 "prev's continuation ~a is not this instruction's continuation ~a"
-                 (continuation (prev ir)) (continuation ir))
-           (test (eql ir (next (prev ir))) ir
-                 "prev ~a's next ~a is not this" (prev ir) (next (prev ir))))
-          (t
-           (test (eql ir (start (continuation ir))) ir
-                 "prev is nil but this is not the start ~a of its continuation ~a"
-                 (start (continuation ir)) (continuation ir))))))
-
-(defmethod verify progn ((ir terminator))
-  (test (typep (destination ir) 'continuation) ir
-        "destination ~a is not a continuation" (destination ir)))
 
 (defun test-ninputs (ir expected)
   (test (eql (length (%uinputs ir)) expected) ir

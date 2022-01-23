@@ -12,7 +12,7 @@
            #:map-continuations)
   (:export #:module #:add-function #:remove-function #:map-functions)
   (:export #:instruction #:continuation #:map-inputs #:inputs)
-  (:export #:bind #:prev #:next)
+  (:export #:node)
   (:export #:terminator #:map-next)
   (:export #:use #:definition #:user)
   (:export #:constant #:value)
@@ -20,10 +20,6 @@
   (:export #:lookup #:cons #:car #:cdr #:enclose #:augment)
   ;; Particular terminators
   (:export #:combination #:local-combination #:eval #:sequence #:continue)
-  ;; Modifications
-  (:export #:replace-datum #:replace-terminator)
-  (:export #:inline #:outline)
-  (:export #:builder #:build-before #:build-after #:build-continuation #:build)
   ;; Copying
   (:export #:copy)
   ;; Assembly

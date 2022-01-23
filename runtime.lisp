@@ -6,13 +6,14 @@
 
 (defclass compiled-operative (operative)
   ((%fun :initarg :fun :reader compiled-operative-fun :type function)
-   (%enclosed :initarg :enclosed :reader enclosed)))
+   (%enclosed :initarg :enclosed :reader enclosed :accessor %enclosed)))
 
 (defmethod combine ((combiner compiled-operative) combinand env)
   (funcall (compiled-operative-fun combiner)
            (enclosed combiner) (cons combinand env)))
 
-(defun caugment (env plist object)
+(defun caugment1 (env) (%augment1 env))
+(defun caugment2 (env plist object)
   (labels ((aux (plist object)
              (etypecase plist
                (ignore (values nil nil))
@@ -28,7 +29,7 @@
                       (aux (cdr plist) (cdr object))
                     (values (append left-names right-names)
                             (append left-values right-values))))))))
-    (multiple-value-call #'%augment env (aux plist object))))
+    (multiple-value-call #'%augment2 env (aux plist object))))
 
 (defun enclose (fun enclosed)
   (make-instance 'compiled-operative :fun fun :enclosed enclosed))

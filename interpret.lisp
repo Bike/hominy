@@ -91,8 +91,11 @@ Signals an error if the symbol is not bound in the environment."
    ;; it shouldn't be especially hard to support someone doing that if they
    ;; really want to for whatever reason.
    (%parents :initarg :parents :reader parents)
-   (%names :initarg :names :reader names :type (simple-array symbol (*)))
-   (%vvec :initarg :vvec :reader vvec :type simple-vector)))
+   (%names :initarg :names :reader names :type (simple-array symbol (*))
+           ;; Set once in %augment2, below.
+           :accessor %names)
+   (%vvec :initarg :vvec :reader vvec :type simple-vector
+          :accessor %vvec)))
 
 (defmethod map-parents (function (env fixed-environment))
   (mapc function (parents env)))
@@ -111,6 +114,14 @@ Signals an error if the symbol is not bound in the environment."
   (make-instance 'fixed-environment
     :parents (list env)
     :names (coerce names 'vector) :vvec (coerce values 'vector)))
+
+;;; Two stage augment, used in the runtime.
+(defun %augment1 (env)
+  (make-instance 'fixed-environment :parents (list env)))
+(defun %augment2 (env names values)
+  (setf (%names env) (coerce names 'vector)
+        (%vvec env) (coerce values 'vector))
+  env)
 
 (defun augment (env &rest bindings)
   (loop for (name value) on bindings by #'cddr
