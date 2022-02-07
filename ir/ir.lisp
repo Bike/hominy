@@ -164,6 +164,14 @@
    (%terminator :initarg :terminator :initform nil :accessor %terminator
                 :reader terminator :type (or null terminator))))
 
+(defmethod (setf %terminator) :before (new (object continuation))
+  (declare (ignore new))
+  (let ((term (terminator object)))
+    (when term
+      (setf (%continuation term) nil))))
+(defmethod (setf %terminator) :after (new (object continuation))
+  (setf (%continuation new) object))
+
 (defmethod function ((object continuation))
   (let ((parent (parent object)))
     (if (typep parent 'function)
@@ -237,16 +245,17 @@
   (map nil function (%functions module)))
 
 ;;; Shared superclass of nodes and terminators.
-(defclass instruction (value user)
-  (;; The continuation this instruction is a part of.
-   (%continuation :initarg :continuation :initform nil :accessor %continuation
-                  :reader continuation :type (or null continuation))))
+(defclass instruction (value user) ())
 
 (defmethod function ((o instruction)) (function (continuation o)))
+(defmethod module ((o instruction)) (module (function o)))
 
 (defclass node (instruction) ())
 
-(defclass terminator (instruction) ())
+(defclass terminator (instruction)
+  (;; The continuation this instruction is a part of.
+   (%continuation :initarg :continuation :initform nil :accessor %continuation
+                  :reader continuation :type (or null continuation))))
 
 (defclass use ()
   ((%definition :initarg :definition :accessor definition :type datum

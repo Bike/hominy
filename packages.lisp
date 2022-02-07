@@ -48,6 +48,7 @@
   ;; Assembly
   (:export #:assemble-continuation #:assemble)
   (:export #:disassemble)
+  (:export #:replace-terminator)
   ;; Verification
   (:export #:verify))
 

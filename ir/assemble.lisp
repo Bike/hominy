@@ -167,3 +167,40 @@
              (setf (%parent ,gstart) ,name (%start ,name) ,gstart
                    (%parent ,rname) ,gstart)
              ,name))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Modifying existing IR
+;;;
+
+(defmacro replace-terminator (inst (instclass &rest inputs))
+  (let ((ginst (gensym "INST"))
+        (gmod (gensym "MODULE")))
+    `(let* ((,ginst ,inst)
+            (,gmod (module ,ginst)))
+       (declare (ignorable ,gmod))
+       (%replace-terminator ,ginst
+                            (mod-build-instruction ,gmod
+                                                   (,instclass ,@inputs))))))
+
+(defun %replace-terminator (inst replacement)
+  (let ((cont (continuation inst)))
+    (setf (%terminator cont) replacement)
+    ;; KLUDGE, since terminator uses are not hooked up correctly
+    (%cleanup inst)
+    #+(or)
+    (map-uses (lambda (use) (setf (definition use) replacement)) inst))
+  replacement)
+
+;;; this is like 
+(defmacro mod-build-instruction (module (instclass &rest inputs))
+  (let ((inputs (loop for input in inputs
+                      collect (typecase input
+                                (symbol input)
+                                (atom `(constant ',input ,module))
+                                ((cl:cons (eql quote))
+                                 `(constant ,(second input) ,module))
+                                (t
+                                 `(mod-build-instruction
+                                      ,module (,@input)))))))
+    `(make-instruction ',instclass nil ,@inputs)))
