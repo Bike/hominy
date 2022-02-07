@@ -13,7 +13,7 @@
 
 (defpackage #:burke/flow
   (:use #:cl)
-  (:local-nicknames (#:type #:burke/type)) ; circular, may be a problem?
+  (:local-nicknames (#:type #:burke/type))
   (:shadow #:type)
   (:export #:info #:default-info)
   (:export #:type)
