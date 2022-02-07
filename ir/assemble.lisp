@@ -138,18 +138,6 @@
          (%assemble-continuation ,name ,children ,@body)
          ,name))))
 
-#+(or)
-(defmacro with-continuation-assembly (((&whole spec
-                                               name paramname parent
-                                               &optional ename pname)
-                                       &body asmbody)
-                                      &body body)
-  (declare (ignore name paramname parent ename pname))
-  (let ((bsym (gensym "BUILDER")))
-    `(let ((,bsym (make-instance 'builder)))
-       (%with-continuation ,spec (,bsym)
-         ,(%assemble-continuation bsym asmbody body)))))
-
 (defmacro assemble ((name enclosedname retname)
                     (contname (paramname) (&rest children) &body cont))
   (let ((gstart (gensym "START")))
