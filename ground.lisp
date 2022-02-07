@@ -45,6 +45,7 @@
     ;; control
     (define (op (simp #'$sequence)) '$sequence env)
     (define (op (simp #'$let)) '$let env)
+    (define (op (simp #'$letrec)) '$letrec env)
     (define (app (ign #'exit)) 'exit env)
     ;; compiler
     (define (op (simp #'$cvau)) '$cvau env))
