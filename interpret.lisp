@@ -182,6 +182,12 @@ Signals an error if the symbol is not bound in the environment."
 (defmethod combine ((combiner applicative) combinand env)
   (combine (unwrap combiner) (evlis combinand env) env))
 
+;;; Given a plist and an array index, returns two values. The first is an
+;;; ordered list of names in the plist. The second is a function of two
+;;; arguments, a combinand and a vector. This function will deconstruct the
+;;; combinand according to the plist, and store values into the given vector,
+;;; starting at the index. The values' positions will correspond to those of
+;;; the names.
 (defun %plist-augmenter (plist start)
   (etypecase plist
     (ignore (values nil (lambda (combinand vec)
@@ -251,21 +257,32 @@ Signals an error if the symbol is not bound in the environment."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass boolean ()
-  ((%value :initarg :value :reader value :type (member t nil))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass boolean ()
+    ((%value :initarg :value :reader value :type (member t nil)))))
+
+(defun booleanp (object) (typep object 'boolean))
+(defconstant true
+  (if (boundp 'true) (symbol-value 'true) (make-instance 'boolean :value t)))
+(defconstant false
+  (if (boundp 'false)
+      (symbol-value 'false)
+      (make-instance 'boolean :value nil)))
+(defmethod make-load-form ((object boolean) &optional env)
+  (make-load-form-saving-slots object :environment env))
 
 (defmethod print-object ((object boolean) stream)
   (if *print-escape*
       (call-next-method)
       (format stream "#~c" (if (value object) #\t #\f))))
 
-(defun booleanp (object) (typep object 'boolean))
-
 (defun $if (env condition then else)
   (let ((c (eval condition env)))
     (cond ((not (booleanp c)) (error "Invalid condition for ~s: ~s" '$if c))
           ((value c) (eval then env))
           (t (eval else env)))))
+
+(defun boolify (object) (if object true false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

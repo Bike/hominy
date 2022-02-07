@@ -13,11 +13,11 @@
 
 (defun read-#t (stream dispchar num)
   (declare (cl:ignore stream dispchar num))
-  (make-instance 'boolean :value t))
+  true)
 
 (defun read-#f (stream dispchar num)
   (declare (cl:ignore stream dispchar num))
-  (make-instance 'boolean :value nil))
+  false)
 
 (defun install-reader-macros (&optional (readtable *readtable*))
   (set-dispatch-macro-character #\# #\i #'read-#i readtable)
