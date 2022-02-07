@@ -14,7 +14,7 @@
       (error "BUG: Missing datum ~a" datum)))
 
 (defgeneric translate-datum (datum))
-(defmethod translate-datum ((datum ir:constant)) `',(value datum))
+(defmethod translate-datum ((datum ir:constant)) `',(ir:value datum))
 (defmethod translate-datum ((datum ir:function)) (dvar datum))
 (defmethod translate-datum ((datum ir:continuation)) (dvar datum))
 (defmethod translate-datum ((datum ir:parameter)) (dvar datum))

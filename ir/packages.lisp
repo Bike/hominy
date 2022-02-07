@@ -1,7 +1,8 @@
 (defpackage #:burke/ir
   (:use #:cl)
+  (:local-nicknames (#:flow #:burke/flow))
   (:shadow #:cons #:car #:cdr #:continue #:function #:inline #:eval #:sequence)
-  (:export #:datum #:name #:map-users)
+  (:export #:datum #:name #:map-users #:map-uses)
   (:export #:value)
   (:export #:parameter #:continuation)
   (:export #:continuation #:function #:parent #:parameter #:start #:terminator
@@ -11,10 +12,10 @@
   (:export #:function #:module #:enclosed #:start #:rcont
            #:map-continuations)
   (:export #:module #:add-function #:remove-function #:map-functions)
-  (:export #:instruction #:continuation #:map-inputs #:inputs)
+  (:export #:instruction #:continuation #:map-inputs #:inputs #:uinputs)
   (:export #:node)
   (:export #:terminator #:map-next)
-  (:export #:use #:definition #:user)
+  (:export #:use #:definition #:user #:info)
   (:export #:constant #:value)
   ;; Particular binds
   (:export #:lookup #:cons #:car #:cdr #:enclose #:augment)

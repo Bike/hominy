@@ -150,7 +150,8 @@
        (%with-continuation ,spec (,bsym)
          ,(%assemble-continuation bsym asmbody body)))))
 
-(defmacro assemble ((name enclosedname retname) &body (cont))
+(defmacro assemble ((name enclosedname retname)
+                    (contname (paramname) (&rest children) &body cont))
   (let ((gstart (gensym "START")))
     (multiple-value-bind (name nameform) (%namespec name)
       (multiple-value-bind (ename enameform) (%namespec enclosedname)
@@ -160,7 +161,9 @@
                     (make-continuation ,rnameform (gensym "RETURN-VALUE")))
                   (,name (make-instance 'function
                            :name ,nameform :enclosed ,ename :rcont ,rname))
-                  (,gstart (assemble-continuation ,@cont)))
+                  (,gstart (assemble-continuation ,contname (,paramname)
+                               (,@children)
+                             ,@cont)))
              (setf (%parent ,gstart) ,name (%start ,name) ,gstart
                    (%parent ,rname) ,gstart)
              ,name))))))

@@ -1,14 +1,24 @@
 (in-package #:burke)
 
-(defclass ignore () ())
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass ignore () ()))
 (defun ignorep (object) (typep object 'ignore))
+(defconstant ignore
+  (if (boundp 'ignore) (symbol-value 'ignore) (make-instance 'ignore)))
+(defmethod make-load-form ((object ignore) &optional env)
+  (make-load-form-saving-slots object :environment env))
 (defmethod print-object ((object ignore) stream)
   (if *print-escape*
       (call-next-method)
       (write-string "#ignore" stream)))
 
-(defclass inert () ())
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass inert () ()))
 (defun inertp (object) (typep object 'inert))
+(defconstant inert
+  (if (boundp 'inert) (symbol-value 'inert) (make-instance 'inert)))
+(defmethod make-load-form ((object inert) &optional env)
+  (make-load-form-saving-slots object :environment env))
 (defmethod print-object ((object inert) stream)
   (if *print-escape*
       (call-next-method)
@@ -314,7 +324,6 @@ Signals an error if the symbol is not bound in the environment."
 (defun $letrec (env bindings &rest body)
   (let* ((names (mapcar #'first bindings))
          (forms (mapcar #'second bindings))
-         (inert (make-instance 'inert))
          (vals (make-array (length names) :initial-element inert))
          (new-env (%augment env names vals)))
     ;; This is a little nasty - we directly mutate the value vector which is

@@ -17,11 +17,11 @@
   (test (and (slot-boundp ir '%name)
              (symbolp (name ir)))
         ir "datum's name is unbound or a non-symbol")
-  (%map-uses (lambda (use)
-               (test (eql (definition use) ir) ir
-                     "datum's use ~a does not have it as a definition, but instead ~a"
-                     use (definition use)))
-             ir))
+  (map-uses (lambda (use)
+              (test (eql (definition use) ir) ir
+                    "datum's use ~a does not have it as a definition, but instead ~a"
+                    use (definition use)))
+            ir))
 
 (defmethod verify progn ((ir user))
   (map nil (lambda (use)

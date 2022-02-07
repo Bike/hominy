@@ -103,10 +103,10 @@
 (defgeneric %remove-use (datum use))
 (defmethod %remove-use ((datum datum) use)
   (setf (%uses datum) (delete use (%uses datum))))
-(defun %map-uses (function datum) (mapc function (%uses datum)) (values))
+(defun map-uses (function datum) (mapc function (%uses datum)) (values))
 
 (defun map-users (function datum)
-  (%map-uses (lambda (use) (funcall function (user use))) datum))
+  (map-uses (lambda (use) (funcall function (user use))) datum))
 
 (defclass value (datum) ()) ; first-class data
 
@@ -114,7 +114,8 @@
   (;; A sequence of USEs. NOTE that PARAMETER only actually needs a set, so
    ;; maybe we should handle this more intelligently. INSTRUCTION does need an
    ;; ordered sequence.
-   (%uinputs :initarg :uinputs :accessor %uinputs :type cl:sequence)))
+   (%uinputs :initarg :uinputs :reader uinputs :accessor %uinputs
+             :type cl:sequence)))
 
 (defun map-inputs (function user)
   (map nil (lambda (use) (funcall function (definition use)))
@@ -186,9 +187,7 @@
    (%enclosed :initarg :enclosed :accessor %enclosed
               :reader enclosed :type enclosed)
    (%start :initarg :start :accessor %start :reader start :type continuation)
-   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)
-   ;; A sequence (could be set) of constants in this function.
-   (%constants :initarg :constants :accessor %constants :type cl:sequence)))
+   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)))
 
 ;;; No add- etc since you should be adding to the parent.
 (defun map-continuations (f function)
@@ -197,13 +196,32 @@
              (map-children #'aux cont)))
     (aux (start function))))
 
+(defun map-instructions (f function)
+  (let ((seen ()))
+    (map-continuations
+     (lambda (cont)
+       (labels ((aux (inst)
+                  (unless (or (member inst seen)
+                              (not (typep inst 'instruction)))
+                    (push inst seen)
+                    (funcall f inst)
+                    (map-inputs #'aux inst))))
+         (aux (terminator cont))))
+     function)))
+
 (defclass module ()
   (;; A sequence (but could be a set) of FUNCTIONs
-   (%functions :initarg :functions :initform nil :accessor %functions)))
+   (%functions :initarg :functions :initform nil :accessor %functions)
+   ;; A sequence (could be set) of constants in this module.
+   (%constants :initarg :constants :initform () :accessor %constants
+               :type cl:sequence)))
 
-(defun add-function (module function) (push function (%functions module)))
+(defun add-function (module function)
+  (setf (%module function) module)
+  (push function (%functions module)))
 (defun remove-function (module function)
-  (setf (%functions module) (delete function (%functions module))))
+  (setf (%module function) nil
+        (%functions module) (delete function (%functions module))))
 (defun map-functions (function module)
   (map nil function (%functions module)))
 
@@ -220,18 +238,23 @@
 (defclass terminator (instruction) ())
 
 (defclass use ()
-  ((%definition :initarg :definition :reader definition :type datum
+  ((%definition :initarg :definition :accessor definition :type datum
+                ;; FIXME: redundant, delete
                 :accessor %definition)
    (%user :initarg :user :reader user :type instruction
           :accessor %user)
    ;; Dataflow analysis should be able to get information specific to this
    ;; use and not the definition. Like the basic
    ;; (if (typep x 'foo) x #|wow it's a foo!!|# x #|but here it's not|#) stuff
-   (%type)))
+   (%info :initform (flow:default-info) :type flow:info :accessor info)))
 
-(defclass constant (node)
+(defclass constant (value)
   ((%value :initarg :value :reader value)))
-(defun constant (value) (make-instance 'constant :value value))
+(defun constant (value module)
+  (or (find value (%constants module) :key #'value)
+      (let ((c (make-instance 'constant :value value)))
+        (push c (%constants module))
+        c)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
