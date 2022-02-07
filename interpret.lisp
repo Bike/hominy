@@ -24,17 +24,6 @@
       (call-next-method)
       (write-string "#inert" stream)))
 
-(defun read-\#i (stream dispchar num)
-  (declare (cl:ignore dispchar num))
-  (flet ((check-char (char)
-           (let ((c (read-char stream)))
-             (unless (char= c char)
-               (error "#i misspelling")))))
-    (let ((next (read-char stream)))
-      (ecase next
-        ((#\g) (map nil #'check-char "nore") (make-instance 'ignore))
-        ((#\n) (map nil #'check-char "ert") (make-instance 'inert))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass environment () ())
@@ -278,14 +267,6 @@ Signals an error if the symbol is not bound in the environment."
           ((value c) (eval then env))
           (t (eval else env)))))
 
-(defun read-#t (stream dispchar num)
-  (declare (cl:ignore stream dispchar num))
-  (make-instance 'boolean :value t))
-
-(defun read-#f (stream dispchar num)
-  (declare (cl:ignore stream dispchar num))
-  (make-instance 'boolean :value nil))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Kernel defines some of these as derived, but some of these are really dang
@@ -344,67 +325,3 @@ Signals an error if the symbol is not bound in the environment."
   (if (consp cons)
       (cdr cons)
       (error 'type-error :expected-type 'cons :datum cons)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun initialize-ground (env)
-  (labels ((simp (f) (lambda (dynamic-env combinand)
-                       (apply f dynamic-env combinand)))
-           (ign (f) (lambda (dynamic-env combinand)
-                      (declare (cl:ignore dynamic-env))
-                      (apply f combinand)))
-           (op (f) (make-instance 'builtin-operative :fun f))
-           (app (f) (make-instance 'applicative :underlying (op f))))
-    ;; core semantics
-    (define (app (ign #'eval)) 'eval env)
-    (define (app (ign #'combine)) 'combine env)
-    (define (app (ign #'lookup)) 'lookup env)
-    ;; ignores
-    (define (app (ign #'ignorep)) 'ignore? env)
-    ;; environments
-    (define (app (ign #'environmentp)) 'environment? env)
-    (define (app (ign #'make-environment)) 'make-environment env)
-    (define (app (ign #'make-fixed-environment)) 'make-fixed-environment env)
-    (define (op (simp #'$define!)) '$define! env)
-    ;; operatives
-    (define (op (simp #'$vau)) '$vau env)
-    (define (app (ign #'operativep)) 'operative? env)
-    ;; applicatives
-    (define (app (ign #'applicativep)) 'applicative? env)
-    (define (app (ign #'wrap)) 'wrap env)
-    (define (app (ign #'unwrap)) 'unwrap env)
-    ;; lists
-    (define (app (ign #'cons)) 'cons env)
-    (define (app (ign #'kar)) 'car env)
-    (define (app (ign #'kdr)) 'cdr env)
-    (define (app (ign #'consp)) 'cons? env) ; "pair?" in kernel
-    (define (app (ign #'null)) 'null? env)
-    ;; symbols
-    (define (app (ign #'symbolp)) 'symbol? env)
-    ;; equivalence
-    (define (app (ign #'eql)) 'eq? env)
-    ;; booleans
-    (define (op (simp #'$if)) '$if env)
-    (define (app (ign #'booleanp)) 'boolean? env)
-    ;; control
-    (define (op (simp #'$sequence)) '$sequence env)
-    (define (op (simp #'$let)) '$let env)
-    (define (app (ign #'exit)) 'exit env))
-  env)
-
-(defun install-reader-macros (&optional (readtable *readtable*))
-  (set-dispatch-macro-character #\# #\i #'read-#i readtable)
-  (set-dispatch-macro-character #\# #\t #'read-#t readtable)
-  (set-dispatch-macro-character #\# #\f #'read-#f readtable)
-  (values))
-
-(defun repl ()
-  (let* ((*readtable* (copy-readtable nil))
-         (*package* (find-package "BURKE"))
-         (ground (make-environment))
-         (repl-env (make-environment ground)))
-    (initialize-ground ground)
-    (install-reader-macros)
-    (catch 'abort
-      (loop (format t "~&> ")
-            (format t "~a~%" (eval (read) repl-env))))))

@@ -18,5 +18,7 @@
    (:file "ir2cl" :depends-on ("interpret" "ir" "packages"))
    (:file "flow" :depends-on ("info" "ir" "packages"))
    (:file "optimize" :depends-on ("flow" "ir" "packages"))
-   #+(or)
-   (:file "compile" :depends-on ("interpret" "runtime" "ir2cl" "packages"))))
+   (:file "compile" :depends-on ("interpret" "runtime" "optimize" "ir2cl"
+                                             "packages"))
+   (:file "ground" :depends-on ("compile" "interpret" "packages"))
+   (:file "repl" :depends-on ("ground" "interpret" "packages"))))
