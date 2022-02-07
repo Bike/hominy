@@ -12,24 +12,5 @@
   (funcall (compiled-operative-fun combiner)
            (enclosed combiner) (cons combinand env)))
 
-(defun caugment1 (env) (%augment1 env))
-(defun caugment2 (env plist object)
-  (labels ((aux (plist object)
-             (etypecase plist
-               (ignore (values nil nil))
-               (null
-                (unless (null object) (error "too many arguments"))
-                (values nil nil))
-               (symbol (values (list plist) (list object)))
-               (cons
-                (unless (consp object) (error "not enough arguments"))
-                (multiple-value-bind (left-names left-values)
-                    (aux (car plist) (car object))
-                  (multiple-value-bind (right-names right-values)
-                      (aux (cdr plist) (cdr object))
-                    (values (append left-names right-names)
-                            (append left-values right-values))))))))
-    (multiple-value-call #'%augment2 env (aux plist object))))
-
 (defun enclose (fun enclosed)
   (make-instance 'compiled-operative :fun fun :enclosed enclosed))
