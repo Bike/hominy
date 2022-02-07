@@ -122,41 +122,11 @@ Signals an error if the symbol is not bound in the environment."
         (%vvec env) (coerce values 'vector))
   env)
 
-(defun caugment1 (env) (%augment1 env))
-(defun caugment2 (env plist object)
-  (labels ((aux (plist object)
-             (etypecase plist
-               (ignore (values nil nil))
-               (null
-                (unless (null object) (error "too many arguments"))
-                (values nil nil))
-               (symbol (values (list plist) (list object)))
-               (cons
-                (unless (consp object) (error "not enough arguments"))
-                (multiple-value-bind (left-names left-values)
-                    (aux (car plist) (car object))
-                  (multiple-value-bind (right-names right-values)
-                      (aux (cdr plist) (cdr object))
-                    (values (append left-names right-names)
-                            (append left-values right-values))))))))
-    (multiple-value-call #'%augment2 env (aux plist object))))
-
 (defun make-fixed-environment (symbols values &rest parents)
   (make-instance 'fixed-environment
     :parents parents
     :names (coerce symbols 'vector)
     :vvec (coerce values 'vector)))
-
-(defun $define! (env name form)
-  (labels ((aux (name value)
-             (etypecase name
-               (ignore)
-               (null (unless (null value) (error "too many arguments")))
-               (symbol (define value name env))
-               (cons (unless (consp value) (error "not enough arguments"))
-                (aux (car name) (car value)) (aux (cdr name) (cdr value))))))
-    (aux name (eval form env)))
-  inert)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -204,79 +174,6 @@ Signals an error if the symbol is not bound in the environment."
 (defmethod combine ((combiner applicative) combinand env)
   (combine (unwrap combiner) (evlis combinand env) env))
 
-;;; Given a plist and an array index, returns two values. The first is an
-;;; ordered list of names in the plist. The second is a function of two
-;;; arguments, a combinand and a vector. This function will deconstruct the
-;;; combinand according to the plist, and store values into the given vector,
-;;; starting at the index. The values' positions will correspond to those of
-;;; the names.
-(defun %plist-augmenter (plist start)
-  (etypecase plist
-    (ignore (values nil (lambda (combinand vec)
-                          (declare (cl:ignore combinand vec)
-                                   ;; hopefully prevents argcount check
-                                   (optimize speed (safety 0))))))
-    (null (values nil (lambda (combinand vec)
-                        (declare (cl:ignore vec) (optimize speed (safety 0)))
-                        (unless (null combinand)
-                          (error "Too many arguments")))))
-    (symbol (values (list plist)
-                    (lambda (combinand vec)
-                      ;; prevent argcount check and vector length check
-                      (declare (optimize speed (safety 0)))
-                      (setf (svref vec start) combinand))))
-    (cons (multiple-value-bind (car-names car-augmenter)
-              (%plist-augmenter (car plist) start)
-            (multiple-value-bind (cdr-names cdr-augmenter)
-                (%plist-augmenter (cdr plist) (+ start (length car-names)))
-              (declare (type (function (t simple-vector))
-                             car-augmenter cdr-augmenter))
-              (values (append car-names cdr-names)
-                      (lambda (combinand vec)
-                        ;; hopefully this will prevent car-augmenter from
-                        ;; checking argcounts and such too
-                        (declare (optimize speed (safety 0)))
-                        (typecase combinand
-                          (cons
-                           (funcall car-augmenter (car combinand) vec)
-                           (funcall cdr-augmenter (cdr combinand) vec))
-                          (t (error "Not enough arguments"))))))))))
-
-;;; Returns a function that, given the dynamic environment and combinand passed
-;;; to an operative, returns a new augmentation of static-env with everything
-;;; in the plist and eparam bound. It sort of pre "compiles" a plist.
-(defun make-augmenter (static-env plist eparam)
-  (etypecase eparam
-    (ignore
-     (multiple-value-bind (names augmenter) (%plist-augmenter plist 0)
-       (declare (type (function (t simple-vector)) augmenter))
-       (let* ((names-vec (coerce names 'vector))
-              (nnames (length names-vec)))
-         (lambda (dynamic-env combinand)
-           (declare (cl:ignore dynamic-env))
-           (let ((vvec (make-array nnames)))
-             (funcall augmenter combinand vvec)
-             (%augment static-env names-vec vvec))))))
-    (symbol
-     (multiple-value-bind (names augmenter) (%plist-augmenter plist 1)
-       (declare (type (function (t simple-vector)) augmenter))
-       (let* ((names-vec (coerce (list* eparam names) 'vector))
-              (nnames (length names-vec)))
-         (lambda (dynamic-env combinand)
-           (let ((vvec (make-array nnames)))
-             (setf (svref vvec 0) dynamic-env)
-             (funcall augmenter combinand vvec)
-             (%augment static-env names-vec vvec))))))))
-
-(defun $vau (static-env plist eparam &rest body)
-  (let ((aug (make-augmenter static-env plist eparam)))
-    (make-instance 'derived-operative
-      :plist plist :eparam eparam :env static-env :augmenter aug
-      ;; Used to do (cons '$sequence body) here, but then $sequence becoming
-      ;; rebound would be an issue, so instead the evaluator (above) has been
-      ;; modified to do a sequence of forms directly.
-      :body body)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -298,12 +195,6 @@ Signals an error if the symbol is not bound in the environment."
       (call-next-method)
       (format stream "#~c" (if (value object) #\t #\f))))
 
-(defun $if (env condition then else)
-  (let ((c (eval condition env)))
-    (cond ((not (booleanp c)) (error "Invalid condition for ~s: ~s" '$if c))
-          ((value c) (eval then env))
-          (t (eval else env)))))
-
 (defun boolify (object) (if object true false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -319,63 +210,6 @@ Signals an error if the symbol is not bound in the environment."
                  for value = (eval form env)
                  when (null rest)
                    return value))))
-
-(defun $let (env bindings &rest body)
-  (let* ((names (mapcar #'first bindings))
-         (values (mapcar (lambda (binding) (eval (second binding) env))
-                         bindings))
-         (new-env (caugment1 env)))
-    (caugment2 new-env names values)
-    (apply #'$sequence new-env body))
-  #+(or)
-  (let ((body (wrap (apply #'$vau env (mapcar #'first bindings)
-                           (make-instance 'ignore)
-                           forms))))
-    (combine body (mapcar #'second bindings) env)))
-
-;;; Given our fixed environments, $letrec actually can't be derived.
-;;; It also has slightly different behavior from Kernel with respect to forms
-;;; that immediately evaluate the newly bound names. In Kernel, doing such will
-;;; get you the outside binding value if there is one, or else error with an
-;;; unbound variable. (This is not stated outright but is the behavior of the
-;;; given derivation.) This here binds everything to #inert. I think the ideal
-;;; would be to signal an error. To do that, either there needs to be a special
-;;; "unbound" marker to put in temporarily, or something like symbol macros.
-;;; I'm inclined towards the latter.
-(defun plist-names (plist)
-  (etypecase plist
-    ((or ignore null) 0)
-    (symbol (list plist))
-    (cons (append (plist-names (car plist)) (plist-names (cdr plist))))))
-
-(defun $letrec (env bindings &rest body)
-  (let* ((names
-           (coerce (reduce #'append bindings
-                           :key (lambda (b) (plist-names (first b))))
-                   'vector))
-         (vals (make-array (length names) :initial-element inert))
-         (new-env (%augment env names vals)))
-    ;; This is a little nasty - we directly mutate the value vector which is
-    ;; now stored in the environment. If %augment started copying, we'd have
-    ;; some issues.
-    ;; OK, kind of a lot nasty. TODO: Cleaner implementation of plists.
-    (loop with i = 0
-          for (bind form) in bindings
-          for val = (eval form new-env)
-          do (labels ((aux (bind val)
-                        (etypecase bind
-                          (ignore)
-                          (null (unless (null val)
-                                  (error "Too many arguments")))
-                          (symbol (setf (svref vals i) val i (1+ i)))
-                          (cons (unless (consp val)
-                                  (error "Not enough arguments"))
-                           (aux (car bind) (car val))
-                           (aux (cdr bind) (cdr val))))))
-               (aux bind val)))
-    (apply #'$sequence new-env body)))
-
-(defun exit () (throw 'abort (make-instance 'inert)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -12,5 +12,12 @@
   (funcall (compiled-operative-fun combiner)
            (enclosed combiner) (cons combinand env)))
 
+(defun caugment1 (env) (%augment1 env))
+(defun caugment2 (env plist object)
+  (let* ((names (coerce (plist-names plist) 'vector))
+         (values (make-array (length names))))
+    (bind-plist-to-vector plist object values 0)
+    (%augment2 env names values)))
+
 (defun enclose (fun enclosed)
   (make-instance 'compiled-operative :fun fun :enclosed enclosed))
