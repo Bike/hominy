@@ -33,5 +33,7 @@
     (initialize-ground ground)
     (install-reader-macros)
     (catch 'abort
-      (loop (format t "~&> ")
-            (format t "~a~%" (eval (read) repl-env))))))
+      (with-simple-restart (abort "Abort the Burke REPL.")
+        (loop (with-simple-restart (continue "Return to the Burke REPL.")
+                (format t "~&> ")
+                (format t "~:a~%" (eval (read) repl-env))))))))
