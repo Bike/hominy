@@ -24,7 +24,7 @@
   (:local-nicknames (#:flow #:burke/flow))
   (:shadow #:cons #:car #:cdr #:continue #:function #:inline #:eval #:sequence
            #:disassemble)
-  (:export #:datum #:name #:map-users #:map-uses)
+  (:export #:datum #:name #:map-users #:map-uses #:unusedp)
   (:export #:value)
   (:export #:parameter #:continuation)
   (:export #:continuation #:function #:parent #:parameter #:start #:terminator

@@ -98,10 +98,15 @@
   (declare (optimize debug))
   (let* ((*vars* (make-hash-table :test #'eq))
          (start (ir:start cfunction))
-         (param (var (ir:parameter start))))
+         (param (ir:parameter start))
+         (vparam (var param))
+         (enclosed (ir:enclosed cfunction))
+         (venclosed (var enclosed)))
     ;; Mark the return continuation as doing nothing
     (setf (gethash (ir:rcont cfunction) *vars*) '#'identity)
     ;; Translate
-    `(lambda (,(var (ir:enclosed cfunction)) ,param)
+    `(lambda (,venclosed ,vparam)
+       ,@(when (ir:unusedp enclosed) `((declare (cl:ignore ,venclosed))))
+       ,@(when (ir:unusedp param) `((declare (cl:ignore ,vparam))))
        (block nil
          ,(translate-continuation start)))))

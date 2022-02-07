@@ -99,11 +99,17 @@
     (write (name o) :stream s))
   o)
 
+(defgeneric %cleanup (datum)
+  (:method-combination progn)
+  (:method progn ((datum datum))))
+
 (defun %add-use (datum use) (push use (%uses datum)))
 (defgeneric %remove-use (datum use))
 (defmethod %remove-use ((datum datum) use)
-  (setf (%uses datum) (delete use (%uses datum))))
+  (when (null (setf (%uses datum) (delete use (%uses datum))))
+    (%cleanup datum)))
 (defun map-uses (function datum) (mapc function (%uses datum)) (values))
+(defun unusedp (datum) (null (%uses datum)))
 
 (defun map-users (function datum)
   (map-uses (lambda (use) (funcall function (user use))) datum))
@@ -123,6 +129,11 @@
   (values))
 (defun inputs (user)
   (loop for use in (%uinputs user) collect (definition use)))
+
+(defmethod %cleanup progn ((datum user))
+  (let ((uins (%uinputs datum)))
+    (setf (%uinputs datum) nil)
+    (mapc #'%cleanup-use uins)))
 
 ;;; Parameter to a continuation. Its inputs are the terminators that branch to
 ;;; the continuation. A start continuation may have no inputs, meaning the
@@ -247,6 +258,16 @@
    ;; use and not the definition. Like the basic
    ;; (if (typep x 'foo) x #|wow it's a foo!!|# x #|but here it's not|#) stuff
    (%info :initform (flow:default-info) :type flow:info :accessor info)))
+
+(defmethod (setf definition) :before (new-def (use use))
+  (%remove-use (definition use) use))
+(defmethod (setf definition) :after (new-def (use use))
+  (%add-use new-def use))
+
+(defun %cleanup-use (use)
+  (let ((def (%definition use)))
+    (setf (%definition use) nil)
+    (%remove-use def use)))
 
 (defclass constant (value)
   ((%value :initarg :value :reader value)))
