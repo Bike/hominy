@@ -37,12 +37,11 @@
     (cond ((type:subtypep formstype list1)
            ;; ($sequence foo)
            (ir:replace-terminator inst
-                                  (ir:eval continuation (ir:car forms) env)))
+               (ir:eval continuation (ir:car forms) env)))
           ((type:subtypep formstype null)
            ;; ($sequence)
-           (let ((continuation (first (ir:inputs inst))))
-             (ir:replace-terminator inst
-                                    (ir:continue continuation 'inert)))))))
+           (ir:replace-terminator inst
+               (ir:continue continuation 'inert))))))
 
 (defun replace-seqs-function (function)
   (ir:map-instructions
@@ -52,3 +51,33 @@
    function))
 
 (defun replace-seqs (module) (ir:map-functions #'replace-seqs-function module))
+
+(defun maybe-replace-eval (inst)
+  (let* ((uins (ir:uinputs inst))
+         (continuation (ir:definition (first uins)))
+         (env (ir:definition (third uins)))
+         (formu (second uins))
+         (form (ir:definition formu))
+         (forminfo (ir:info formu))
+         (formtype (flow:type forminfo))
+         (symbol (type:symbol))
+         (top (type:top))
+         (cons (type:cons top top)))
+    ;; TODO: Self evaluating objects
+    (cond ((type:subtypep formtype symbol)
+           (ir:replace-terminator inst
+               (ir:continue continuation (ir:lookup form env))))
+          ((type:subtypep formtype cons)
+             (ir:replace-terminator inst
+                 (ir:combination continuation (ir:car form)
+                                 (ir:cons (ir:cdr form) env)))))))
+
+(defun replace-evals-function (function)
+  (ir:map-instructions
+   (lambda (inst)
+     (when (typep inst 'ir:eval)
+       (maybe-replace-eval inst)))
+   function))
+
+(defun replace-evals (module)
+  (ir:map-functions #'replace-evals-function module))

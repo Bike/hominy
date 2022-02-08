@@ -40,7 +40,9 @@
 (defun inps (inputs) (mapcar #'inp inputs))
 (defun ins (instruction) (inps (ir:inputs instruction)))
 
-(defmethod translate-node ((node ir:lookup)) `(lookup ,@(ins node)))
+(defmethod translate-node ((node ir:lookup))
+  ;; KLUDGE
+  (values nil `(setf ,(dvar node) (lookup ,@(ins node)))))
 (defmethod translate-node ((node ir:cons))
   (values `(cons nil nil)
           (let ((v (dvar node)) (i (ins node)))

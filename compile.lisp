@@ -14,8 +14,12 @@
     (ir:add-function module cf)
     (flow:forward-propagate-datum (ir:enclosed cf) einf)
     (replace-seqs module)
+    (flow:forward-propagate-datum (ir:enclosed cf) einf) ; KLUDGE
+    (replace-evals module)
+    (flow:forward-propagate-datum (ir:enclosed cf) einf) ; KLUDGE
     (constant-propagate module)
     (when *dis* (print (ir:disassemble module)))
+    (ir:verify module)
     (let* ((cls (ir2cl cf))
            (f (compile nil cls)))
       (make-instance 'compiled-operative :fun f :enclosed enclosed))))

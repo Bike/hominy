@@ -142,6 +142,9 @@
              `(progn ,@(loop for name in names collect `(defsingle ,name)))))
   (defsingles symbol))
 
+(defmethod typep ((constant cl:symbol) (type symbol)) t)
+(defmethod typep ((constant t) (type symbol)) nil)
+
 (defclass cons (type)
   ((%car :initarg :car :reader car :type type)
    (%cdr :initarg :cdr :reader cdr :type type)))
