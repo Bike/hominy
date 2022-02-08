@@ -100,6 +100,16 @@
          ,@(if sets `((setf ,@sets)) nil)
          ,@body))))
 
+(defun %fix-parameter-uinputs (continuation)
+  ;; any user of the continuation is a definition of its parameter.
+  (let ((param (parameter continuation)))
+    (map-users (lambda (user)
+                 (let ((use (make-instance 'use
+                              :definition user :user param)))
+                   (%add-uinput use param)
+                   (%add-use user use)))
+               continuation)))
+
 (defmacro %assemble-continuation (cform (&rest children) &body body)
   (let ((childinfo
           (loop for child in children
@@ -124,10 +134,13 @@
                           (%assemble-continuation ,rcname
                                                   ,gchildren ,@asmbody)))
        ;; Add children to this continuation
-       ,@(loop for (rcname) in childinfo collect `(add-child ,cform ,rcname))
+       ,@(loop for (rcname) in childinfo
+               collect `(add-child ,cform ,rcname))
        ;; Build this continuation
        (with-bindings-built (,@bindings)
-         (setf (%terminator ,cform) (build-instruction nil ,@terminator))))))
+         (setf (%terminator ,cform) (build-instruction nil ,@terminator)))
+       ;; Fix our parameter's inputs
+       (%fix-parameter-uinputs ,cform))))
 
 (defmacro assemble-continuation (name (paramname) (&rest children)
                                  &body body)
@@ -152,6 +165,7 @@
                   (,gstart (assemble-continuation ,contname (,paramname)
                                (,@children)
                              ,@cont)))
+             (%fix-parameter-uinputs ,rname)
              (setf (%parent ,gstart) ,name (%start ,name) ,gstart
                    (%parent ,rname) ,gstart)
              ,name))))))
@@ -174,9 +188,6 @@
 (defun %replace-terminator (inst replacement)
   (let ((cont (continuation inst)))
     (setf (%terminator cont) replacement)
-    ;; KLUDGE, since terminator uses are not hooked up correctly
-    (%cleanup inst)
-    #+(or)
     (map-uses (lambda (use) (setf (definition use) replacement)) inst))
   replacement)
 
