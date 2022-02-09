@@ -110,7 +110,7 @@
                    (%add-use user use)))
                continuation)))
 
-(defmacro %assemble-continuation (cform (&rest children) &body body)
+(defmacro %%assemble-continuation (cform (&rest children) &body body)
   (let ((childinfo
           (loop for child in children
                 collect (destructuring-bind
@@ -142,14 +142,24 @@
        ;; Fix our parameter's inputs
        (%fix-parameter-uinputs ,cform))))
 
-(defmacro assemble-continuation (name (paramname) (&rest children)
+(defmacro %assemble-continuation (name (paramname) (&rest children)
                                  &body body)
   (multiple-value-bind (name nameform) (%namespec name)
     (multiple-value-bind (pname pnameform) (%namespec paramname)
       `(let* ((,name (make-continuation ,nameform ,pnameform))
               (,pname (parameter ,name)))
-         (%assemble-continuation ,name ,children ,@body)
+         (%%assemble-continuation ,name ,children ,@body)
          ,name))))
+
+(defmacro assemble-continuation (name (paramname) parent (&rest children)
+                                 &body body)
+  (let ((psym (gensym "PARENT")))
+    `(let ((,name
+             (%assemble-continuation ,name (,paramname) (,@children) ,@body))
+           (,psym ,parent))
+       (setf (%parent ,name) ,psym)
+       (add-child ,psym ,name)
+       ,name)))
 
 (defmacro assemble ((name enclosedname retname)
                     (contname (paramname) (&rest children) &body cont))
@@ -162,7 +172,7 @@
                     (make-continuation ,rnameform (gensym "RETURN-VALUE")))
                   (,name (make-instance 'function
                            :name ,nameform :enclosed ,ename :rcont ,rname))
-                  (,gstart (assemble-continuation ,contname (,paramname)
+                  (,gstart (%assemble-continuation ,contname (,paramname)
                                (,@children)
                              ,@cont)))
              (%fix-parameter-uinputs ,rname)
@@ -189,6 +199,19 @@
 (defun %replace-terminator (inst replacement)
   (let ((cont (continuation inst)))
     (setf (%terminator cont) replacement)
+    ;; Remove all of the old terminator's USEs. This should trigger cleanup.
+    (map-uses (lambda (use)
+                (let ((user (user use)))
+                  (%remove-uinput use user))
+                (%remove-use inst use))
+              inst)
+    ;; Add a use for every continuation input of the replacement. Ugly/KLUDGE
+    (dolist (input (inputs replacement))
+      (when (typep input 'continuation)
+        (let* ((param (parameter input))
+               (use (make-instance 'use :definition replacement :user param)))
+          (%add-use replacement use)
+          (%add-uinput use param))))
     (map-uses (lambda (use) (setf (definition use) replacement)) inst)
     ;; Maintain the linearization.
     ;; FIXME: Can we do this to only the added instruction to save some time?

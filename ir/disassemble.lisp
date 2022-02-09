@@ -41,7 +41,7 @@
     ;; ensure names are there
     (disassemble-ir (parameter ir))
     (loop for child in children
-          do (setf (gethash ir *dis-names*) (dis-name child)))
+          do (setf (gethash child *dis-names*) (dis-name child)))
     (setf (gethash terminator *dis-names*) (dis-name terminator))
     ;; disassemble
     `(,name (,(gethash ir *dis-names*))

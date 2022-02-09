@@ -146,6 +146,8 @@
 
 (defun %add-uinput (use parameter)
   (push use (%uinputs parameter)))
+(defun %remove-uinput (use parameter)
+  (setf (%uinputs parameter) (delete use (%uinputs parameter))))
 
 ;;; The return continuation is somewhat magical, and some of these slots
 ;;; will be unbound. The parent will be the function's start continuation.

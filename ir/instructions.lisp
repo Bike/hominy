@@ -25,7 +25,7 @@
 
 ;;; NOTE: All terminators have their destination as first operand.
 ;;; Also note that the dynenv of a combination is incorporated into the
-;;; argument for uniform treatment.
+;;; argument for uniform treatment (argument = (combinand . dynenv)).
 ;; inputs: continuation, combiner, argument
 (defclass combination (terminator) ())
 ;; inputs: continuation, combiner, enclosed, argument

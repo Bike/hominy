@@ -66,10 +66,15 @@
                (ir:continue continuation (ir:lookup form env)))
            t)
           ((type:subtypep formtype cons)
-           (ir:replace-terminator inst
-               (ir:combination continuation (ir:car form)
-                               (ir:cons (ir:cdr form) env)))
-           t)
+           (let* ((evalcont (ir:continuation inst))
+                  (combcont
+                    (ir:assemble-continuation combine (combiner) evalcont
+                        ()
+                      (ir:combination continuation combiner
+                                      (ir:cons (ir:cdr form) env)))))
+             (ir:replace-terminator inst
+                 (ir:eval combcont (ir:car form) env))
+             t))
           (t nil))))
 
 (defun optimize-function (function enclosed-info)

@@ -21,3 +21,6 @@
 
 (defun enclose (fun enclosed)
   (make-instance 'compiled-operative :fun fun :enclosed enclosed))
+
+(defun ccombine (combiner argument)
+  (combine combiner (car argument) (cdr argument)))

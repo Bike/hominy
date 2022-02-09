@@ -64,7 +64,7 @@
 ;;; Multiple-successor terminators will look different.
 (defmethod translate-terminator ((inst ir:combination))
   `(return (funcall ,(dvar (first (ir:inputs inst)))
-                    (combine ,@(inps (rest (ir:inputs inst)))))))
+                    (ccombine ,@(inps (rest (ir:inputs inst)))))))
 (defmethod translate-terminator ((inst ir:eval))
   `(return (funcall ,(dvar (first (ir:inputs inst)))
                     (eval ,@(inps (rest (ir:inputs inst)))))))
@@ -82,17 +82,17 @@
          ;; so that they can refer to one another.
          (cfnames
            (loop for child in children
-                 for name = (make-symbol (ir:name child))
+                 for name = (make-symbol (symbol-name (ir:name child)))
                  do (setf (gethash child *vars*) `#',name)
                  collect name))
          (terminator (ir:terminator cont))
          (*translation-creations* nil)
          (*translation-initializations* nil)
          (body (translate-terminator terminator)))
-    `(labels (,@(loop for child in children for cfname in cfnames
-                      collect `(,cfname (,(var (ir:parameter child)))
-                                        ,(translate-continuation child))))
-       (let* (,@(nreverse *translation-creations*))
+    `(let* (,@(nreverse *translation-creations*))
+       (labels (,@(loop for child in children for cfname in cfnames
+                        collect `(,cfname (,(var (ir:parameter child)))
+                                          ,(translate-continuation child))))
          ,@(nreverse *translation-initializations*)
          ,body))))
 
