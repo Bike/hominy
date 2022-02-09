@@ -23,7 +23,10 @@
 (defun constant-propagate (module)
   (ir:map-functions #'constant-propagate-function module))
 
-(defun maybe-replace-seq (inst)
+(defgeneric maybe-replace-instruction (instruction)
+  (:method ((inst ir:instruction))))
+
+(defmethod maybe-replace-instruction ((inst ir:sequence))
   (let* ((uins (ir:uinputs inst))
          (continuation (ir:definition (first uins)))
          (env (ir:definition (third uins)))
@@ -37,22 +40,16 @@
     (cond ((type:subtypep formstype list1)
            ;; ($sequence foo)
            (ir:replace-terminator inst
-               (ir:eval continuation (ir:car forms) env)))
+               (ir:eval continuation (ir:car forms) env))
+           t)
           ((type:subtypep formstype null)
            ;; ($sequence)
            (ir:replace-terminator inst
-               (ir:continue continuation 'inert))))))
+               (ir:continue continuation 'inert))
+           t)
+          (t nil))))
 
-(defun replace-seqs-function (function)
-  (ir:map-instructions
-   (lambda (inst)
-     (when (typep inst 'ir:sequence)
-       (maybe-replace-seq inst)))
-   function))
-
-(defun replace-seqs (module) (ir:map-functions #'replace-seqs-function module))
-
-(defun maybe-replace-eval (inst)
+(defmethod maybe-replace-instruction ((inst ir:eval))
   (let* ((uins (ir:uinputs inst))
          (continuation (ir:definition (first uins)))
          (env (ir:definition (third uins)))
@@ -66,18 +63,25 @@
     ;; TODO: Self evaluating objects
     (cond ((type:subtypep formtype symbol)
            (ir:replace-terminator inst
-               (ir:continue continuation (ir:lookup form env))))
+               (ir:continue continuation (ir:lookup form env)))
+           t)
           ((type:subtypep formtype cons)
-             (ir:replace-terminator inst
-                 (ir:combination continuation (ir:car form)
-                                 (ir:cons (ir:cdr form) env)))))))
+           (ir:replace-terminator inst
+               (ir:combination continuation (ir:car form)
+                               (ir:cons (ir:cdr form) env)))
+           t)
+          (t nil))))
 
-(defun replace-evals-function (function)
-  (ir:map-instructions
-   (lambda (inst)
-     (when (typep inst 'ir:eval)
-       (maybe-replace-eval inst)))
-   function))
-
-(defun replace-evals (module)
-  (ir:map-functions #'replace-evals-function module))
+(defun optimize-function (function enclosed-info)
+  (tagbody
+   loop
+     (flow:forward-propagate-datum (ir:enclosed function) enclosed-info)
+     (ir:map-instructions
+      (lambda (inst)
+        (when (maybe-replace-instruction inst)
+          (go loop)))
+      function))
+  ;; constant "propagation" never actually adds information, as the actual
+  ;; propagation is done by flow. so we do this last.
+  (constant-propagate-function function)
+  (values))

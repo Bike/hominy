@@ -189,7 +189,10 @@
 (defun %replace-terminator (inst replacement)
   (let ((cont (continuation inst)))
     (setf (%terminator cont) replacement)
-    (map-uses (lambda (use) (setf (definition use) replacement)) inst))
+    (map-uses (lambda (use) (setf (definition use) replacement)) inst)
+    ;; Maintain the linearization.
+    ;; FIXME: Can we do this to only the added instruction to save some time?
+    (relinearize-function (function replacement)))
   replacement)
 
 ;;; this is like 
