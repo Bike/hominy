@@ -1,13 +1,16 @@
 (in-package #:burke/flow)
 
-(defgeneric compute-info (user)
-  (:method ((user burke/ir:user)) (default-info)))
+(defgeneric compute-info (datum)
+  (:method ((user burke/ir:datum)) (default-info)))
 
-(defmethod compute-info ((user burke/ir:parameter))
+(defmethod compute-info ((datum burke/ir:parameter))
   ;; NOTE: For propagation to terminate, this join must meet the ascending
   ;; chain condition.
   ;; FIXME: Currently it doesn't (e.g. member types)
-  (reduce #'join/2 (burke/ir:uinputs user) :key #'burke/ir:info))
+  (reduce #'join/2 (burke/ir:uinputs datum) :key #'burke/ir:info))
+
+(defmethod compute-info ((dat burke/ir:constant))
+  (make-instance 'info :type (type:member (burke/ir:value dat))))
 
 (defmethod compute-info ((inst burke/ir:lookup))
   (let* ((inps (burke/ir:uinputs inst))
@@ -38,8 +41,8 @@
        (let ((m (meet/2 info uinfo)))
          (when (subinfop m uinfo)
            (setf (burke/ir:info use) m)
-           (forward-propagate-user (burke/ir:user use))))))
+           (forward-propagate (burke/ir:user use))))))
    datum))
 
-(defun forward-propagate-user (user)
-  (forward-propagate-datum user (compute-info user)))
+(defun forward-propagate (datum)
+  (forward-propagate-datum datum (compute-info datum)))
