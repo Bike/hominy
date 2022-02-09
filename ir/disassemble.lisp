@@ -1,5 +1,10 @@
 (in-package #:burke/ir)
 
+;;;; Note that we don't use the linearization here. This is because
+;;;; a) i wrote this disassembler before the linearizer, and
+;;;; b) i expect the linearizer will screw up at some point, and i want to be
+;;;;    able to keep reading disassemblies when it does.
+
 (defvar *unnamed-count*)
 (defvar *dis-names*)
 (defgeneric dis-name (datum))

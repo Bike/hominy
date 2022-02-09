@@ -206,7 +206,10 @@
    (%enclosed :initarg :enclosed :accessor %enclosed
               :reader enclosed :type enclosed)
    (%start :initarg :start :accessor %start :reader start :type continuation)
-   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)))
+   (%rcont :initarg :rcont :accessor %rcont :reader rcont :type continuation)
+   ;; The beginning and end of the instruction linearization.
+   (%start-inst :initform nil :accessor %start-inst :type (or instruction null))
+   (%end-inst :initform nil :accessor %end-inst :type (or instruction null))))
 
 ;;; No add- etc since you should be adding to the parent.
 (defun map-continuations (f function)
@@ -216,17 +219,10 @@
     (aux (start function))))
 
 (defun map-instructions (f function)
-  (let ((seen ()))
-    (map-continuations
-     (lambda (cont)
-       (labels ((aux (inst)
-                  (unless (or (member inst seen)
-                              (not (typep inst 'instruction)))
-                    (push inst seen)
-                    (funcall f inst)
-                    (map-inputs #'aux inst))))
-         (aux (terminator cont))))
-     function)))
+  (loop for inst = (%start-inst function) then next
+        for next = (%next inst)
+        do (funcall f inst)
+        until (null next)))
 
 (defclass module ()
   (;; A sequence (but could be a set) of FUNCTIONs
@@ -245,7 +241,15 @@
   (map nil function (%functions module)))
 
 ;;; Shared superclass of nodes and terminators.
-(defclass instruction (value user) ())
+(defclass instruction (value user)
+  (;; PREV and NEXT are used to iterate over instructions efficiently
+   ;; i.e. in linear time and without consing.
+   ;; If A is an input to B, A is before B in the ordering, and other
+   ;; than that the ordering is undefined. In particular there's no
+   ;; guarantee that instructions of the same continuation are grouped.
+   ;; See linearize.lisp to see how the order is computed.
+   (%prev :initform nil :accessor %prev :type (or null instruction))
+   (%next :initform nil :accessor %next :type (or null instruction))))
 
 (defmethod function ((o instruction)) (function (continuation o)))
 (defmethod module ((o instruction)) (module (function o)))

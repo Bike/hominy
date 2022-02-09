@@ -168,6 +168,7 @@
              (%fix-parameter-uinputs ,rname)
              (setf (%parent ,gstart) ,name (%start ,name) ,gstart
                    (%parent ,rname) ,gstart)
+             (linearize-function ,name)
              ,name))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
