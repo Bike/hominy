@@ -44,9 +44,10 @@
           do (setf (gethash child *dis-names*) (dis-name child)))
     (setf (gethash terminator *dis-names*) (dis-name terminator))
     ;; disassemble
-    `(,name (,(gethash ir *dis-names*))
-         (,@(mapcar #'disassemble-ir children))
-       ,@(disassemble-ir terminator))))
+    (let ((body (disassemble-ir terminator)))
+      `(,name (,(gethash ir *dis-names*))
+            (,@(mapcar #'disassemble-ir children))
+          ,@body))))
 
 (defmethod disassemble-ir ((ir function))
   (let* ((enclosed (enclosed ir))
