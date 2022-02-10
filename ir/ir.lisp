@@ -272,7 +272,7 @@
    ;; Dataflow analysis should be able to get information specific to this
    ;; use and not the definition. Like the basic
    ;; (if (typep x 'foo) x #|wow it's a foo!!|# x #|but here it's not|#) stuff
-   (%info :initform (flow:default-info) :type flow:info :accessor info)))
+   (%info :initform (info:default-info) :type info:info :accessor info)))
 
 (defmethod (setf definition) :before (new-def (use use))
   (%remove-use (definition use) use))

@@ -11,17 +11,17 @@
   (:export #:typep #:subtypep #:conjoin #:disjoin)
   (:export #:lookup))
 
-(defpackage #:burke/flow
+(defpackage #:burke/info
   (:use #:cl)
   (:local-nicknames (#:type #:burke/type))
   (:shadow #:type)
-  (:export #:info #:default-info)
-  (:export #:type)
-  (:export #:forward-propagate-datum))
+  (:export #:info #:default-info
+           #:join/2 #:meet/2 #:subinfop)
+  (:export #:type))
 
 (defpackage #:burke/ir
   (:use #:cl)
-  (:local-nicknames (#:flow #:burke/flow))
+  (:local-nicknames (#:info #:burke/info))
   (:shadow #:cons #:car #:cdr #:continue #:function #:inline #:eval #:sequence
            #:disassemble)
   (:export #:datum #:name #:map-users #:map-uses #:unusedp)
@@ -52,9 +52,17 @@
   ;; Verification
   (:export #:verify))
 
+(defpackage #:burke/flow
+  (:use #:cl)
+  (:local-nicknames (#:info #:burke/info)
+                    (#:ir #:burke/ir)
+                    (#:type #:burke/type))
+  (:export #:forward-propagate-datum))
+
 (defpackage #:burke
   (:use #:cl)
   (:shadow #:eval #:boolean #:variable #:ignore)
-  (:local-nicknames (#:ir #:burke/ir)
+  (:local-nicknames (#:info #:burke/info)
+                    (#:ir #:burke/ir)
                     (#:type #:burke/type)
                     (#:flow #:burke/flow)))

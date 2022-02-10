@@ -7,7 +7,7 @@
 ;;;  that cannot be dumped.)
 
 (defun %operative-ir (enclosed)
-  (let* ((einf (make-instance 'flow:info :type (type:member enclosed)))
+  (let* ((einf (make-instance 'info:info :type (type:member enclosed)))
          (module (make-instance 'ir:module))
          (cf (fresh-function)))
     (ir:add-function module cf)

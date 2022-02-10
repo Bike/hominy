@@ -1,4 +1,4 @@
-(in-package #:burke/flow)
+(in-package #:burke/info)
 
 ;; An INFO is something passed around by flow analysis (data or control).
 ;; In order to run something like Kildall, they must support meet and join
