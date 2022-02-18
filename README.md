@@ -73,7 +73,7 @@ In Common Lisp we could write:
                                 collect `((,pred object) ,i))))))
 ```
 
-Now for example `(predicator '(consp characterp))` returns a function that returns 0 for integers, 1 for symbols, 2 for conses, and 3 for characters.
+Now for example `(tagger '(consp characterp))` returns a function that returns 0 for integers, 1 for symbols, 2 for conses, and 3 for characters.
 
 When the definition of `tagger` is compiled, it will (in any Common Lisp I am aware of) not do anything with the constant data. No compilation of the function to be produced will take place until the predicates are actually presented. If `tagger` is called multiple times, each time the compiler will go through the same motions of compiling the first two cond clauses.
 
