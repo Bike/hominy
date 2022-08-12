@@ -6,9 +6,10 @@
   (:export #:top #:bot #:top-p #:bot-p)
   (:export #:type
            #:environment #:member #:elements #:symbol
-           #:cons #:car #:cdr #:list
-           #:applicative #:operative)
-  (:export #:typep #:subtypep #:conjoin #:disjoin)
+           #:cons #:car #:cdr #:list #:elemtype
+           #:applicative #:unwrap #:operative)
+  (:export #:typep #:subtypep #:conjoin/2 #:disjoin/2 #:conjoin #:disjoin
+           #:unparse)
   (:export #:lookup))
 
 (defpackage #:burke/info
