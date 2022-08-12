@@ -3,20 +3,14 @@
           ($cond ((symbol? form) (lookup form env))
                  ((cons? form) (combine (car form) (cdr form) env))
                  (#t form))))
-  ;; This is different from Shutt's definition: it captures the dynamic
-  ;; environment. I think this is actually more regular, but we'll see.
-  ;; Assuming an actual inliner, this capture shouldn't be any more of a problem
-  ;; efficiency-wise than that possible with any normal combination.
-  ;; It allows a very literal specification of the dynenv-preserving property
-  ;; of e.g. cl:map.
-  ;; Safety-wise, with an argument applicative we should always specify a
-  ;; dynamic environment rather than use one from inside a library definition.
-  ;; Actually this is the case for any code, i.e. apply and call should only be
-  ;; used if you're really sure about what you're calling. This implies that
-  ;; any higher order function needs to be defined with wrap $vau, but that is
-  ;; pretty inconvenient.
-  (apply (wrap ($vau (app args) dynenv) (combine (unwrap app) args dynenv)))
-  (call (wrap ($vau (app . args) dynenv) (combine (unwrap app) args dynenv)))
+  ;; apply and eapply are split, unlike in shutt where the dynenv is an
+  ;; optional parameter. i think optional parameters are kind of ugly when
+  ;; there's no syntax for them, especially for such a fundamental operator.
+  ;; in particular, i don't think shutt's signals an error on too many args.
+  (apply ($lambda (app args)
+           (combine (unwrap app) args (make-fixed-environment () ()))))
+  (call ($lambda (app . args)
+          (combine (unwrap app) args (make-fixed-environment () ()))))
   (eapply ($lambda (app args dynenv) (combine (unwrap app) args dynenv)))
   (ecall ($lambda (app dynenv . args) (combine (unwrap app) args dynenv)))
   ($cond ($vau clauses env
