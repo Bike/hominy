@@ -25,11 +25,11 @@
   (set-dispatch-macro-character #\# #\f #'read-#f readtable)
   (values))
 
-(defun repl ()
+(defun repl (&key (modules nil))
   (let* ((*readtable* (copy-readtable nil))
          (*package* (find-package "BURKE/INTERPRETER/SYMS"))
          (ground (i:make-ground-environment))
-         (repl-env (i:make-environment ground)))
+         (repl-env (apply #'i:make-environment ground modules)))
     (install-reader-macros)
     (catch 'abort
       (with-simple-restart (abort "Abort the Burke REPL.")
