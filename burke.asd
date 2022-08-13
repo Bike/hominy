@@ -3,6 +3,12 @@
   :components
   ((:file "packages")
    (:file "interpret" :depends-on ("packages"))
+   (:module "vm"
+    :depends-on ("interpret" "packages")
+    :components ((:file "ops")
+                 (:file "packages" :depends-on ("ops"))
+                 (:file "vm" :depends-on ("ops" "packages"))
+                 (:file "dis" :depends-on ("vm" "ops" "packages"))))
    (:file "plist" :depends-on ("packages"))
    (:file "type" :depends-on ("packages"))
    (:file "info" :depends-on ("type" "packages"))
