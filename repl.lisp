@@ -8,16 +8,16 @@
                (error "#i misspelling")))))
     (let ((next (read-char stream)))
       (ecase next
-        ((#\g) (map nil #'check-char "nore") (make-instance 'ignore))
-        ((#\n) (map nil #'check-char "ert") (make-instance 'inert))))))
+        ((#\g) (map nil #'check-char "nore") i:ignore)
+        ((#\n) (map nil #'check-char "ert") i:inert)))))
 
 (defun read-#t (stream dispchar num)
   (declare (cl:ignore stream dispchar num))
-  true)
+  i:true)
 
 (defun read-#f (stream dispchar num)
   (declare (cl:ignore stream dispchar num))
-  false)
+  i:false)
 
 (defun install-reader-macros (&optional (readtable *readtable*))
   (set-dispatch-macro-character #\# #\i #'read-#i readtable)
@@ -27,13 +27,12 @@
 
 (defun repl ()
   (let* ((*readtable* (copy-readtable nil))
-         (*package* (find-package "BURKE"))
-         (ground (make-environment))
-         (repl-env (make-environment ground)))
-    (initialize-ground ground)
+         (*package* (find-package "BURKE/INTERPRETER"))
+         (ground (i:make-ground-environment))
+         (repl-env (i:make-environment ground)))
     (install-reader-macros)
     (catch 'abort
       (with-simple-restart (abort "Abort the Burke REPL.")
         (loop (with-simple-restart (continue "Return to the Burke REPL.")
                 (format t "~&> ")
-                (format t "~&~:a~%" (eval (read) repl-env))))))))
+                (format t "~&~:a~%" (i:eval (read) repl-env))))))))

@@ -62,8 +62,5 @@
 
 (defpackage #:burke
   (:use #:cl)
-  (:shadow #:eval #:boolean #:variable #:ignore)
-  (:local-nicknames (#:info #:burke/info)
-                    (#:ir #:burke/ir)
-                    (#:type #:burke/type)
-                    (#:flow #:burke/flow)))
+  (:local-nicknames (#:i #:burke/interpreter))
+  (:export #:repl))

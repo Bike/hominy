@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:burke/interpreter)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass ignore () ()))
@@ -148,6 +148,10 @@ Signals an error if the symbol is not bound in the environment."
 (defclass operative (combiner) ())
 (defclass builtin-operative (operative)
   ((%fun :initarg :fun :reader builtin-impl :type function)))
+(defun make-builtin-operative (function)
+  "Make an operative implemented as a CL function.
+The function will receive two arguments, the dynamic environment and the combinand."
+  (make-instance 'builtin-operative :fun function))
 (defclass derived-operative (operative)
   ((%plist :initarg :plist :reader plist) 
    (%eparam :initarg :eparam :reader eparam :type (or ignore symbol))

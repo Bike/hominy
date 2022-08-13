@@ -1,15 +1,20 @@
 (defsystem :burke
   :depends-on ()
   :components
-  ((:file "packages")
-   (:file "interpret" :depends-on ("packages"))
+  ((:module "interpreter"
+    :depends-on ()
+    :components ((:file "packages")
+                 (:file "interpret" :depends-on ("packages"))
+                 (:file "plist" :depends-on ("packages"))
+                 (:file "ground" :depends-on ("interpret" "plist" "packages"))))
+   (:file "packages")
+   (:file "repl" :depends-on ("interpreter" "packages"))
    (:module "vm"
-    :depends-on ("interpret" "packages")
+    :depends-on ("interpreter" "packages")
     :components ((:file "ops")
                  (:file "packages" :depends-on ("ops"))
                  (:file "vm" :depends-on ("ops" "packages"))
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
-   (:file "plist" :depends-on ("packages"))
    (:file "type" :depends-on ("packages"))
    (:file "info" :depends-on ("type" "packages"))
    (:module "ir"
@@ -21,12 +26,11 @@
                  (:file "assemble" :depends-on ("linearize" "ir"))
                  (:file "disassemble" :depends-on ("ir"))
                  (:file "verify" :depends-on ("instructions" "ir"))))
-   (:file "compile-initial" :depends-on ("ir" "interpret" "packages"))
-   (:file "runtime" :depends-on ("plist" "interpret" "packages"))
-   (:file "ir2cl" :depends-on ("interpret" "ir" "packages"))
+   (:file "compile-initial" :depends-on ("ir" "packages"))
+   (:file "runtime" :depends-on ("interpreter" "packages"))
+   (:file "ir2cl" :depends-on ("interpreter" "ir" "packages"))
    (:file "flow" :depends-on ("info" "ir" "packages"))
    (:file "optimize" :depends-on ("flow" "ir" "packages"))
-   (:file "compile" :depends-on ("interpret" "runtime" "optimize" "ir2cl"
-                                             "packages"))
-   (:file "ground" :depends-on ("compile" "interpret" "plist" "packages"))
-   (:file "repl" :depends-on ("ground" "interpret" "packages"))))
+   (:file "compile" :depends-on ("interpreter" "runtime" "optimize" "ir2cl"
+                                               "packages"))
+   ))

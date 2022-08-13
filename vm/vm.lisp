@@ -27,7 +27,7 @@
               :type (simple-array (unsigned-byte 8) (*)))
    (%constants :initarg :constants :reader constants :type simple-vector)))
 
-(defclass code (burke::operative)
+(defclass code (i:operative)
   ((%module :initarg :module :reader module :type module)
    (%xep :initarg :xep :reader xep :type (and unsigned-byte fixnum))
    (%sep :initarg :sep :reader sep :type (and unsigned-byte fixnum))
@@ -35,7 +35,7 @@
    (%nstack :initarg :nstack :reader nstack :type (and unsigned-byte fixnum))
    (%nclosed :initarg :nclosed :reader nclosed :type (and unsigned-byte fixnum))))
 
-(defclass closure (burke::operative)
+(defclass closure (i:operative)
   ((%code :initarg :code :reader code)
    (%closed :initarg :closed :reader closed :type simple-vector)))
 
@@ -74,20 +74,20 @@
         ((#.o:jump) (incf ip (next-label)))
         ((#.o:jump-if-true)
          (let ((label (next-label)))
-           (if (eql (spop) burke::true)
+           (if (eql (spop) i:true)
                (incf ip label)
                (incf ip))))
         ((#.o:combine)
          (let ((env (spop)) (combinand (spop)) (combiner (spop)))
-           (spush (burke::combine combiner combinand env)))
+           (spush (i:combine combiner combinand env)))
          (incf ip))
         ((#.o:tail-combine)
          ;; this isn't much of a tail combination - the lisp may not be smart enough
          ;; to axe VM's stack frame before combining. FIXME
          (let ((env (spop)) (combinand (spop)) (combiner (spop)))
-           (return-from vm (burke::combine combiner combinand env))))
+           (return-from vm (i:combine combiner combinand env))))
         ((#.o:lookup)
-         (let ((env (spop)) (sym (spop))) (spush (burke::lookup sym env)))
+         (let ((env (spop)) (sym (spop))) (spush (i:lookup sym env)))
          (incf ip))
         ((#.o:enclose)
          (let ((code (constant (next-code))))
@@ -95,7 +95,7 @@
          (incf ip))
         ((#.o:make-environment)
          (let ((names (constant (next-code))))
-           (spush (burke::make-fixed-environment names (gather (length names)) (spop))))
+           (spush (i:make-fixed-environment names (gather (length names)) (spop))))
          (incf ip))
         ;; call, tail-call
         ((#.o:err-if-not-cons)
@@ -108,14 +108,14 @@
          (incf ip))))))
 
 ;;; CODEs can be used directly as combiners iff they are not closures.
-(defmethod burke::combine ((combiner code) combinand env)
+(defmethod i:combine ((combiner code) combinand env)
   (assert (zerop (nclosed combiner)))
   (let ((module (module combiner))
         (frame (make-frame (nregs combiner) (nstack combiner))))
     (setf (reg frame 0) combinand (reg frame 1) env)
     (vm (bytecode module) frame #() (constants module) :ip (xep combiner))))
 
-(defmethod burke::combine ((combiner closure) combinand env)
+(defmethod i:combine ((combiner closure) combinand env)
   (let* ((code (code combiner))
          (closed (closed combiner))
          (module (module code))

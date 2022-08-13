@@ -7,23 +7,31 @@
 ;;;  that cannot be dumped.)
 
 (defun %operative-ir (enclosed)
-  (let* ((einf (make-instance 'info:info :type (type:member enclosed)))
-         (module (make-instance 'ir:module))
+  (let* ((einf (make-instance 'burke/info:info :type (burke/type:member enclosed)))
+         (module (make-instance 'burke/ir:module))
          (cf (fresh-function)))
-    (ir:add-function module cf)
+    (burke/ir:add-function module cf)
     (optimize-function cf einf)
-    (ir:verify module)
+    (burke/ir:verify module)
     cf))
 
 (defun $cvau (static-env plist eparam &rest body)
   (let* ((enclosed (list* static-env plist eparam body))
          (ir (%operative-ir enclosed))
-         (module (ir:module ir)))
-    (when *dis* (format t "~&~a~%" (ir:disassemble module)))
-    (ir:verify module)
+         (module (burke/ir:module ir)))
+    (when *dis* (format t "~&~a~%" (burke/ir:disassemble module)))
+    (burke/ir:verify module)
     (let* ((cls (ir2cl ir))
            (f (compile nil cls)))
       (make-instance 'compiled-operative :fun f :enclosed enclosed))))
+
+(defun compilation-module ()
+  "Return a Burke environment with bindings for the flow compiler."
+  ;; called "module" instead of "environment" because a compilation environment
+  ;; is something different.
+  (i:make-fixed-environment
+   '($cvau)
+   (list (i:make-builtin-operative (lambda (env combinand) (apply #'$cvau env combinand))))))
 
 ;;; debugging
 (defun operative-ir (static-env plist eparam &rest body)

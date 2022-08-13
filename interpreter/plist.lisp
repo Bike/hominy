@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:burke/interpreter)
 
 ;;;; Operators for dealing with plists. Plists, or "parameter lists", are how
 ;;;; Burke binds things. For example, the parameters to a function, or the

@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:burke/interpreter)
 
 (defun bindings->namesvec (bindings)
   (coerce (loop for (plist) in bindings nconc (plist-names plist)) 'vector))
@@ -59,7 +59,7 @@
              (funcall augmenter combinand vvec)
              (%augment static-env names-vec vvec))))))))
 
-(defun $vau (static-env plist eparam &rest body)
+(defun make-derived-operative (static-env plist eparam body)
   (let ((aug (make-augmenter static-env plist eparam)))
     (make-instance 'derived-operative
       :plist plist :eparam eparam :env static-env :augmenter aug
@@ -67,6 +67,9 @@
       ;; rebound would be an issue, so instead the COMBINE method has been
       ;; modified to do a sequence of forms directly.
       :body body)))
+
+(defun $vau (static-env plist eparam &rest body)
+  (make-derived-operative static-env plist eparam body))
 
 (defun $define! (env name form)
   (bind-plist name (eval form env)
@@ -132,7 +135,7 @@
     (define (op (simp #'$sequence)) '$sequence env)
     (define (op (simp #'$let)) '$let env)
     (define (op (simp #'$letrec)) '$letrec env)
-    (define (app (ign #'exit)) 'exit env)
-    ;; compiler
-    (define (op (simp #'$cvau)) '$cvau env))
+    (define (app (ign #'exit)) 'exit env))
   env)
+
+(defun make-ground-environment () (initialize-ground (make-environment)))
