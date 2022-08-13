@@ -27,7 +27,7 @@
 
 (defun repl ()
   (let* ((*readtable* (copy-readtable nil))
-         (*package* (find-package "BURKE/INTERPRETER"))
+         (*package* (find-package "BURKE/INTERPRETER/SYMS"))
          (ground (i:make-ground-environment))
          (repl-env (i:make-environment ground)))
     (install-reader-macros)

@@ -30,8 +30,9 @@
   ;; called "module" instead of "environment" because a compilation environment
   ;; is something different.
   (i:make-fixed-environment
-   '($cvau)
-   (list (i:make-builtin-operative (lambda (env combinand) (apply #'$cvau env combinand))))))
+   '(burke/interpreter/syms::$cvau)
+   (list (i:make-builtin-operative
+          (lambda (env combinand) (apply #'$cvau env combinand))))))
 
 ;;; debugging
 (defun operative-ir (static-env plist eparam &rest body)

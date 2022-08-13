@@ -101,41 +101,41 @@
            (op (f) (make-instance 'builtin-operative :fun f))
            (app (f) (make-instance 'applicative :underlying (op f))))
     ;; core semantics
-    (define (app (ign #'eval)) 'eval env)
-    (define (app (ign #'combine)) 'combine env)
-    (define (app (ign #'lookup)) 'lookup env)
+    (define (app (ign #'eval)) 'syms::eval env)
+    (define (app (ign #'combine)) 'syms::combine env)
+    (define (app (ign #'lookup)) 'syms::lookup env)
     ;; ignores
-    (define (app (ignb #'ignorep)) 'ignore? env)
+    (define (app (ignb #'ignorep)) 'syms::ignore? env)
     ;; environments
-    (define (app (ign #'environmentp)) 'environment? env)
-    (define (app (ign #'make-environment)) 'make-environment env)
-    (define (app (ign #'make-fixed-environment)) 'make-fixed-environment env)
-    (define (op (simp #'$define!)) '$define! env)
+    (define (app (ign #'environmentp)) 'syms::environment? env)
+    (define (app (ign #'make-environment)) 'syms::make-environment env)
+    (define (app (ign #'make-fixed-environment)) 'syms::make-fixed-environment env)
+    (define (op (simp #'$define!)) 'syms::$define! env)
     ;; operatives
-    (define (op (simp #'$vau)) '$vau env)
-    (define (app (ignb #'operativep)) 'operative? env)
+    (define (op (simp #'$vau)) 'syms::$vau env)
+    (define (app (ignb #'operativep)) 'syms::operative? env)
     ;; applicatives
-    (define (app (ignb #'applicativep)) 'applicative? env)
-    (define (app (ign #'wrap)) 'wrap env)
-    (define (app (ign #'unwrap)) 'unwrap env)
+    (define (app (ignb #'applicativep)) 'syms::applicative? env)
+    (define (app (ign #'wrap)) 'syms::wrap env)
+    (define (app (ign #'unwrap)) 'syms::unwrap env)
     ;; lists
-    (define (app (ign #'cons)) 'cons env)
-    (define (app (ign #'kar)) 'car env)
-    (define (app (ign #'kdr)) 'cdr env)
-    (define (app (ignb #'consp)) 'cons? env) ; "pair?" in kernel
-    (define (app (ignb #'null)) 'null? env)
+    (define (app (ign #'cons)) 'syms::cons env)
+    (define (app (ign #'kar)) 'syms::car env)
+    (define (app (ign #'kdr)) 'syms::cdr env)
+    (define (app (ignb #'consp)) 'syms::cons? env) ; "pair?" in kernel
+    (define (app (ignb #'null)) 'syms::null? env)
     ;; symbols
-    (define (app (ignb #'symbolp)) 'symbol? env)
+    (define (app (ignb #'symbolp)) 'syms::symbol? env)
     ;; equivalence
-    (define (app (ignb #'eql)) 'eq? env)
+    (define (app (ignb #'eql)) 'syms::eq? env)
     ;; booleans
-    (define (op (simp #'$if)) '$if env)
-    (define (app (ignb #'booleanp)) 'boolean? env)
+    (define (op (simp #'$if)) 'syms::$if env)
+    (define (app (ignb #'booleanp)) 'syms::boolean? env)
     ;; control
-    (define (op (simp #'$sequence)) '$sequence env)
-    (define (op (simp #'$let)) '$let env)
-    (define (op (simp #'$letrec)) '$letrec env)
-    (define (app (ign #'exit)) 'exit env))
+    (define (op (simp #'$sequence)) 'syms::$sequence env)
+    (define (op (simp #'$let)) 'syms::$let env)
+    (define (op (simp #'$letrec)) 'syms::$letrec env)
+    (define (app (ign #'exit)) 'syms::exit env))
   env)
 
 (defun make-ground-environment () (initialize-ground (make-environment)))
