@@ -1,4 +1,4 @@
-(in-package #:burke/vm)
+(in-package #:burke/vm/asm)
 
 (defun disassemble-bytecode (bytecode &key (start 0))
   (loop with pc = start
@@ -24,7 +24,7 @@
 
 (defgeneric disassemble (object))
 
-(defmethod disassemble ((obj module))
+(defmethod disassemble ((obj vm:module))
   (disassemble-bytecode (bytecode obj)))
 
 ;; can't do CODE until it has an end point - oops!

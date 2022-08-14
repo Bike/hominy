@@ -14,6 +14,7 @@
     :components ((:file "ops")
                  (:file "packages" :depends-on ("ops"))
                  (:file "vm" :depends-on ("ops" "packages"))
+                 (:file "asm" :depends-on ("vm" "packages"))
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
    (:file "type" :depends-on ("packages"))
    (:file "info" :depends-on ("type" "packages"))
