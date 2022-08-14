@@ -18,6 +18,9 @@
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
    (:file "type" :depends-on ("packages"))
    (:file "info" :depends-on ("type" "packages"))
+   (:module "quickc"
+    :depends-on ("vm" "interpreter")
+    :components ((:file "compile")))
    (:module "ir"
     :depends-on ("info" "packages")
     :components ((:file "ir")
