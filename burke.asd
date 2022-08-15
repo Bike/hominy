@@ -1,11 +1,12 @@
 (defsystem :burke
-  :depends-on ()
+  :depends-on (:cl-conspack)
   :components
   ((:module "interpreter"
     :depends-on ()
     :components ((:file "packages")
                  (:file "interpret" :depends-on ("packages"))
                  (:file "plist" :depends-on ("packages"))
+                 (:file "marshal" :depends-on ("interpret" "packages"))
                  (:file "ground" :depends-on ("interpret" "plist" "packages"))))
    (:file "packages" :depends-on ("interpreter"))
    (:file "repl" :depends-on ("interpreter" "packages"))

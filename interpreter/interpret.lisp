@@ -40,6 +40,9 @@ If it exists, returns VALUE T; otherwise NIL NIL."))
   (:argument-precedence-order environment symbol new)
   (:documentation "Modify an existing binding, or create a new one.
 Note that it is not possible to create or modify bindings in a parent."))
+(defgeneric map-bindings (function environment)
+  (:argument-precedence-order environment function)
+  (:documentation "Call FUNCTION on all symbols and values locally bound."))
 
 (defun lookup (symbol environment)
   "Find the value bound to SYMBOL in ENVIRONMENT.
@@ -78,6 +81,11 @@ Signals an error if the symbol is not bound in the environment."
         (setf (car cell) new)
         (setf (cell symbol env) (list new))))
   new)
+(defmethod map-bindings (function (env regular-environment))
+  ;; FIXME: This function is basically used for linking, and linking will need to
+  ;; be more aware of cells in the future.
+  (maphash (lambda (sym cell) (funcall function sym (car cell)))
+           (regular-environment-table env)))
 
 (defun make-environment (&rest parents)
   (make-instance 'regular-environment :parents parents))
@@ -108,6 +116,8 @@ Signals an error if the symbol is not bound in the environment."
     (if pos
         (setf (aref (vvec env) pos) new)
         (error "New bindings cannot be added to a fixed environment ~a" env))))
+(defmethod map-bindings (function (env fixed-environment))
+  (map function (names env) (vvec env)))
 
 (defun %augment (env names values)
   (make-instance 'fixed-environment
@@ -158,8 +168,9 @@ The function will receive two arguments, the dynamic environment and the combina
    (%env :initarg :env :reader env)
    ;; A function that, given the dynamic environment and combinand, returns a
    ;; new environment to evaluate the body in. PLIST, EPARAM, and ENV are only
-   ;; there for introspection/completeness/whatever.
-   (%augmenter :initarg :augmenter :reader augmenter :type function)
+   ;; there for introspection/completeness/whatever. One use is that they can
+   ;; be used when deserializing to recompute an augmenter.
+   (%augmenter :initarg :augmenter :accessor augmenter :type function)
    ;; A list of forms (not just one form)
    (%body :initarg :body :reader body)))
 (defclass applicative (combiner)

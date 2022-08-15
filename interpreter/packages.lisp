@@ -14,4 +14,5 @@
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment)
   (:export #:make-ground-environment #:make-standard-environment)
-  (:export #:bind-plist-to-vector))
+  (:export #:bind-plist-to-vector)
+  (:export #:marshal #:marshal-to-file #:unmarshal #:unmarshal-from-file))
