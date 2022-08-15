@@ -62,5 +62,7 @@
 
 (defpackage #:burke
   (:use #:cl)
+  (:shadow #:read #:read-from-string)
   (:local-nicknames (#:i #:burke/interpreter))
-  (:export #:repl))
+  (:export #:repl)
+  (:export #:read #:read-from-string))
