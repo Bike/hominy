@@ -144,6 +144,8 @@ Semantically, operatives contain references to their static environments. It is 
 
 In contrast, we could have the operative `(eval (list $vau () #ignore x) (make-standard-environment))`. If marshaled and unmarshaled relative to an environment containing x, this operator would return whatever value x had at unmarshaling time (because that value was in a binding in the linkage environment, and thus subject to linking) but would not be sensitive to changes to x's binding, because semantically the operative just returns the object in the body it was evaluated with, rather than looking up the variable x.
 
+This last case is why the linking is done not just with respect to the environment, but to objects in that environment. While literal operatives and so on may not seem very common, they will come up in macroexpansions, and more generally when a compiler rewrites `(applicative ...)` to use `(unwrap applicative)` as a constant, etc.
+
 ### Technical Note
 
 Shutt's notes on `$binds?` mention that the programmer should be unable to get a complete list of variables bound by an environment, but that the capability to enumerate such a list is not a problem. The requirements of linkage allow programmers to determine whether a given **value** is bound to some variable in an environment, by careful use of marshaling and unmarshaling using that environment as the linkage environment. But similarly to `$binds?`, this would only allow an enumeration procedure.
