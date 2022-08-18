@@ -6,7 +6,8 @@
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
                     (#:asm #:burke/vm/asm))
-  (:export #:compile #:empty-cenv #:make-cenv #:make-standard-cenv #:binding))
+  (:export #:compile #:empty-cenv #:make-cenv #:make-standard-cenv #:binding)
+  (:export #:compilation-module))
 
 (in-package #:burke/quickc)
 
@@ -154,6 +155,26 @@
                        else do (error "How did ~a get in the closure vector?"
                                       item))
                  'simple-vector))))
+
+(defun compile-combiner (combiner cenv)
+  (etypecase combiner
+    (i:derived-operative
+     (compile (i:plist combiner) (i:eparam combiner)
+              (i:body combiner) cenv (i:env combiner)))
+    (i:applicative
+     (i:wrap (compile-combiner (i:unwrap combiner) cenv)))
+    (i:combiner combiner)))
+
+(defun compilation-module ()
+  "Return a Burke environment with bindings for the quick compiler."
+  (i:make-fixed-environment
+   '(syms::compile syms::standard-compilation-environment)
+   (list (i:wrap (i:make-builtin-operative
+                  (lambda (env combinand)
+                    (declare (ignore env))
+                    (destructuring-bind (combiner cenv) combinand
+                      (compile-combiner combiner cenv)))))
+         (make-standard-cenv))))
 
 (defun linearize-plist (plist)
   (etypecase plist
