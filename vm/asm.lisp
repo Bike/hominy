@@ -54,7 +54,7 @@
          (nconstants (length cconstants))
          (constants (make-array nconstants))
          (module (make-instance 'vm:module
-                   :bytecode bytecode :constants (copy-seq (constants cmodule))))
+                   :bytecode bytecode :constants constants))
          (codes
            (loop for xep-start = 0 then (+ xep-start (length fbytecode))
                  for cfunction in cfunctions
@@ -65,7 +65,7 @@
                            :nregs (nlocals cfunction) :nstack (nstack cfunction)
                            :nclosed (length (closed cfunction))))))
     (loop for i below nconstants
-          for cconst = (aref constants i)
+          for cconst = (aref cconstants i)
           do (setf (aref constants i)
                    (if (typep cconst 'cfunction)
                        (nth (position cconst cfunctions) codes)
