@@ -21,7 +21,8 @@
    (:file "info" :depends-on ("type" "packages"))
    (:module "quickc"
     :depends-on ("vm" "interpreter")
-    :components ((:file "compile")))
+    :components ((:file "compile")
+                 (:file "known" :depends-on ("compile"))))
    (:module "ir"
     :depends-on ("info" "packages")
     :components ((:file "ir")

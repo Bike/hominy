@@ -2,6 +2,7 @@
   (:use #:cl)
   (:shadow #:compile #:tailp)
   (:local-nicknames (#:i #:burke/interpreter)
+                    (#:syms #:burke/interpreter/syms)
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
                     (#:asm #:burke/vm/asm))
@@ -21,6 +22,12 @@
 (defclass local-operative-info (info)
   ((%cfunction :initarg :cfunction :reader cfunction)
    (%ret-info :initarg :ret :reader ret-info :type info)))
+
+;;; Note that we use names instead of directly compile-$vau etc here because
+;;; eventually, these infos will hopefully be usable in the other compilers,
+;;; so we need a little bit of indirection.
+(defclass known-operator-info (info)
+  ((%name :initarg :name :reader name)))
 
 (defmethod info-type ((info local-operative-info))
   ;; I'm just making up these types as I go along.
@@ -45,7 +52,7 @@
 
 ;;; Info about a variable binding.
 (defclass binding ()
-  ((%type :initarg :type :initform t :reader binding-type)))
+  ((%info :initarg :info :reader info)))
 
 ;;; A locally bound variable.
 (defclass local-binding (binding)
@@ -131,7 +138,7 @@
                        if (eq item cenvironment)
                          collect environment
                        else if (symbolp item)
-                              collect (burke/interpreter:lookup item environment)
+                              collect (i:lookup item environment)
                        else do (error "How did ~a get in the closure vector?"
                                       item))
                  'simple-vector))))
@@ -152,7 +159,8 @@
                    (augment1 cenv
                              (list (cons eparam (make-instance 'local-binding
                                                   :cfunction cf
-                                                  :index 1))))
+                                                  :index 1
+                                                  :info (make-instance 'ginfo)))))
                    cenv)))
     (declare (ignore _))
     (multiple-value-bind (bindings context nlocals nstack) (gen-plist cf plist)
@@ -217,7 +225,8 @@
        ;; Just use index 0 and don't bind anything.
        (values (list (cons plist (make-instance 'local-binding
                                    :cfunction cfunction
-                                   :index 0)))
+                                   :index 0
+                                   :info (make-instance 'ginfo))))
                context 0 0))
       (i:ignore (values nil context 0 0))
       (cons ; this is the hard part.
@@ -235,7 +244,8 @@
                          (assemble context 'o:set l)
                          (values (list (cons plist (make-instance 'local-binding
                                                      :cfunction cfunction
-                                                     :index l)))
+                                                     :index l
+                                                     :info (make-instance 'ginfo))))
                                  0)))
                       (cons
                        (let ((cons-local next-temp-local))
@@ -286,17 +296,16 @@
 
 (defun compile-symbol (symbol cenv context)
   (let* ((binding (lookup symbol cenv))
-         (info (make-instance 'ginfo
-                 :type (if binding (binding-type binding) 't))))
+         (info (if binding
+                   (info binding)
+                   (make-instance 'ginfo))))
     (when (null binding)
       (warn "Unknown variable ~a" symbol))
     (cond ((not (valuep context)) (return-from compile-symbol (result info 0 0)))
           ((and (typep binding 'local-binding)
                 (eq (cfunction binding) (cfunction context)))
            ;; Actually local
-           (assemble context 'o:ref (index binding))
-           (when (tailp context) (assemble context 'o:return))
-           (result (make-instance 'ginfo :type (binding-type binding)) 0 1))
+           (assemble context 'o:ref (index binding)))
           (t ; have to close
            (assemble context 'o:closure
              ;; FIXME: Only recording the symbol is probably wrong in general,
@@ -308,23 +317,29 @@
 
 (defun compile-cons (combinerf combinand cenv context)
   (let* ((combinerr (compile-form combinerf cenv (context context :valuep t :tailp nil)))
-         #+(or)
-         (combinert (info-type (info combinerr)))
-         (nlocals (nlocals combinerr)))
-    ;; Generic. FIXME
-    (let ((res
-            (compile-constant combinand (context context :valuep t :tailp nil))))
-      (assemble context 'o:ref (env-index context))
-      (cond ((tailp context)
-             (assemble context 'o:tail-combine)
-             (result (make-instance 'ginfo)
-                     ;; 2 because 1 for constant, 1 for env-index
-                     (max nlocals (nlocals res)) (+ 2 (nstack res))))
-            ((valuep context)
-             (assemble context 'o:combine)
-             (result (make-instance 'ginfo)
-                     (max nlocals (nlocals res)) (+ 2 (nstack res))))
-            (t
-             (assemble context 'o:combine 'o:drop)
-             (result (make-instance 'ginfo)
-                     (max nlocals (nlocals res)) (+ 2 (nstack res))))))))
+         (combineri (info combinerr))
+         (cres
+           (cond ((and (typep combineri 'known-operator-info)
+                       ;; We know what this is, so try something special.
+                       ;; This can return NIL, in which case we have to try
+                       ;; something else.
+                       (compile-known-operation (name combineri)
+                                                combinand cenv context)))
+                 (t (compile-general-combination combinand cenv context)))))
+    (result (info cres)
+            (max (nlocals cres) (nlocals combinerr))
+            (+ (nstack cres) (nstack combinerr)))))
+
+;;; The combiner is on the stack, and we don't know shit about it.
+;;; This is basically a worst case scenario and might warrant a style warning,
+;;; or at least some kind of "hey! your performance is going to crap" note.
+(defun compile-general-combination (combinand cenv context)
+  (declare (ignore cenv))
+  (let ((res
+          (compile-constant combinand (context context :valuep t :tailp nil))))
+    (assemble context 'o:ref (env-index context))
+    (cond ((tailp context) (assemble context 'o:tail-combine))
+          ((valuep context) (assemble context 'o:combine))
+          (t (assemble context 'o:combine 'o:drop)))
+    ;; +1 for env reference.
+    (result (make-instance 'ginfo) (nlocals res) (+ (nstack res) 1))))
