@@ -6,7 +6,7 @@
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
                     (#:asm #:burke/vm/asm))
-  (:export #:compile #:empty-cenv #:make-cenv #:binding))
+  (:export #:compile #:empty-cenv #:make-cenv #:make-standard-cenv #:binding))
 
 (in-package #:burke/quickc)
 
@@ -77,6 +77,18 @@
 (defun make-cenv (completep &rest bindings)
   (make-instance 'cenvironment
     :parents nil :bindings bindings :completep completep))
+
+;;; FIXME: Needs more definitions, obviously.
+;;; Also FIXME: The constant :: kind of sucks.
+(defun make-standard-cenv ()
+  (make-instance 'cenvironment
+    :parents nil :completep nil
+    :bindings (mapcar (lambda (sym)
+                        (cons sym
+                              (make-instance 'binding
+                                :info (make-instance 'known-operator-info
+                                        :name sym))))
+                      '(syms::$vau))))
 
 ;;; Do a simple augmentation - complete, only one parent.
 (defun augment1 (parent bindings)
