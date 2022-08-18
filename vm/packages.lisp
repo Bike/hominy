@@ -10,7 +10,7 @@
   (:local-nicknames (#:vm #:burke/vm)
                     (#:o #:burke/vm/ops))
   (:export #:assemble #:link)
-  (:export #:cmodule #:constant-index
+  (:export #:cmodule #:constant-index #:closure-index
            #:cfunction #:sep #:nlocals #:nstack #:closed #:nbytes)
   (:export #:disassemble #:disassemble-bytecode))
 

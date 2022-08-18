@@ -25,6 +25,10 @@
 (defmethod initialize-instance :after ((inst cfunction) &key cmodule &allow-other-keys)
   (push inst (cfunctions cmodule)))
 
+(defun closure-index (cfunction thing)
+  (or (position thing (closed cfunction))
+      (vector-push-extend thing (closed cfunction))))
+
 (defun nbytes (cfunction) (length (bytecode cfunction)))
 
 (defun assemble (cfunction &rest items)
@@ -38,6 +42,9 @@
 
 ;;; Produce a vm:module and vm:codes from cfunction and its module, by resolving any
 ;;; unresolved labels (when that's a thing), concatenating the bytecode vector, etc.
+;;; If the cfunction closes over anything, RESOLVE is called on each element of the
+;;; assembler closed vector to produce the values. Otherwise a CODE is returned
+;;; directly.
 (defun link (cfunction)
   (let* ((cmodule (cmodule cfunction))
          (cfunctions (cfunctions cmodule))

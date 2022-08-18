@@ -5,7 +5,7 @@
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
                     (#:asm #:burke/vm/asm))
-  (:export #:compile #:empty-cenv))
+  (:export #:compile #:empty-cenv #:make-cenv #:binding))
 
 (in-package #:burke/quickc)
 
@@ -49,7 +49,9 @@
 
 ;;; A locally bound variable.
 (defclass local-binding (binding)
-  (;; Register assignment.
+  (;; What function is it local to?
+   (%cfunction :initarg :cfunction :reader cfunction)
+   ;; Register assignment.
    (%index :initarg :index :reader index)))
 
 (defclass cenvironment ()
@@ -64,6 +66,10 @@
 
 (defun empty-cenv ()
   (make-instance 'cenvironment :parents nil :bindings nil))
+
+(defun make-cenv (completep &rest bindings)
+  (make-instance 'cenvironment
+    :parents nil :bindings bindings :completep completep))
 
 ;;; Do a simple augmentation - complete, only one parent.
 (defun augment1 (parent bindings)
@@ -117,8 +123,18 @@
 (defun compile (plist eparam body cenvironment environment)
   (let* ((result (compile-operative plist eparam body cenvironment
                                     (make-instance 'asm:cmodule)))
-         (code (asm:link (cfunction (info result)))))
-    (vm:enclose code (vector environment))))
+         (cfunction (cfunction (info result)))
+         (code (asm:link cfunction)))
+    (vm:enclose code
+                (coerce
+                 (loop for item across (asm:closed cfunction)
+                       if (eq item cenvironment)
+                         collect environment
+                       else if (symbolp item)
+                              collect (burke/interpreter:lookup item environment)
+                       else do (error "How did ~a get in the closure vector?"
+                                      item))
+                 'simple-vector))))
 
 (defun linearize-plist (plist)
   (etypecase plist
@@ -129,10 +145,16 @@
 (defun compile-operative (plist eparam body cenv module)
   (let* ((cf (make-instance 'asm:cfunction
                :cmodule module :plist plist :eparam eparam))
+         ;; All quick-compiled functions close over their static environment,
+         ;; because quickc is not smart enough to remove it.
+         (_ (asm:closure-index cf cenv))
          (cenv (if (symbolp eparam)
                    (augment1 cenv
-                             (list (cons eparam (make-instance 'local-binding :index 1))))
+                             (list (cons eparam (make-instance 'local-binding
+                                                  :cfunction cf
+                                                  :index 1))))
                    cenv)))
+    (declare (ignore _))
     (multiple-value-bind (bindings context nlocals nstack) (gen-plist cf plist)
       (setf (asm:sep cf) (asm:nbytes (cfunction context)))
       ;; Set up the current environment to be in index 2.
@@ -175,7 +197,7 @@
              (body (compile-seq body (augment1 cenv bindings) context))
              (info (make-instance 'local-operative-info
                      :cfunction cf :ret (info body)))
-             (nlocals (+ 2 nlocals (nlocals body)))
+             (nlocals (+ 3 nlocals (nlocals body)))
              (nstack (max nstack estack (nstack body))))
         (setf (asm:nlocals cf) nlocals (asm:nstack cf) nstack)
         (result info 0 0)))))
@@ -193,7 +215,9 @@
        (values nil context 0 1))
       (symbol
        ;; Just use index 0 and don't bind anything.
-       (values (list (cons plist (make-instance 'local-binding :index 0)))
+       (values (list (cons plist (make-instance 'local-binding
+                                   :cfunction cfunction
+                                   :index 0)))
                context 0 0))
       (i:ignore (values nil context 0 0))
       (cons ; this is the hard part.
@@ -209,7 +233,9 @@
                       (symbol
                        (let ((l (next-var-local)))
                          (assemble context 'o:set l)
-                         (values (list (cons plist (make-instance 'local-binding :index l)))
+                         (values (list (cons plist (make-instance 'local-binding
+                                                     :cfunction cfunction
+                                                     :index l)))
                                  0)))
                       (cons
                        (let ((cons-local next-temp-local))
@@ -259,32 +285,46 @@
     (t (compile-constant form context))))
 
 (defun compile-symbol (symbol cenv context)
-  (let ((binding (lookup symbol cenv)))
-    (etypecase binding
-      (local-binding
-       (cond ((valuep context)
-              (assemble context 'o:ref (index binding))
-              (when (tailp context) (assemble context 'o:return))
-              (result (make-instance 'ginfo :type (binding-type binding)) 0 1))
-             (t (result (make-instance 'ginfo :type (binding-type binding)) 0 0)))))))
+  (let* ((binding (lookup symbol cenv))
+         (info (make-instance 'ginfo
+                 :type (if binding (binding-type binding) 't))))
+    (when (null binding)
+      (warn "Unknown variable ~a" symbol))
+    (cond ((not (valuep context)) (return-from compile-symbol (result info 0 0)))
+          ((and (typep binding 'local-binding)
+                (eq (cfunction binding) (cfunction context)))
+           ;; Actually local
+           (assemble context 'o:ref (index binding))
+           (when (tailp context) (assemble context 'o:return))
+           (result (make-instance 'ginfo :type (binding-type binding)) 0 1))
+          (t ; have to close
+           (assemble context 'o:closure
+             ;; FIXME: Only recording the symbol is probably wrong in general,
+             ;; since we might want to close over things from outside the
+             ;; direct static environment at some point.
+             (asm:closure-index (cfunction context) symbol))))
+    (when (tailp context) (assemble context 'o:return))
+    (result info 0 1)))
 
 (defun compile-cons (combinerf combinand cenv context)
   (let* ((combinerr (compile-form combinerf cenv (context context :valuep t :tailp nil)))
          #+(or)
          (combinert (info-type (info combinerr)))
-         (nlocals (nlocals combinerr)) (nstack (nstack combinerr)))
+         (nlocals (nlocals combinerr)))
     ;; Generic. FIXME
-    (let ((res (compile-constant combinand (context context :valuep t :tailp nil))))
+    (let ((res
+            (compile-constant combinand (context context :valuep t :tailp nil))))
       (assemble context 'o:ref (env-index context))
       (cond ((tailp context)
              (assemble context 'o:tail-combine)
              (result (make-instance 'ginfo)
-                     (max nlocals (nlocals res)) (max nstack (nstack res) 1)))
+                     ;; 2 because 1 for constant, 1 for env-index
+                     (max nlocals (nlocals res)) (+ 2 (nstack res))))
             ((valuep context)
              (assemble context 'o:combine)
              (result (make-instance 'ginfo)
-                     (max nlocals (nlocals res)) (max nstack (nstack res) 1)))
+                     (max nlocals (nlocals res)) (+ 2 (nstack res))))
             (t
              (assemble context 'o:combine 'o:drop)
              (result (make-instance 'ginfo)
-                     (max nlocals (nlocals res)) (max nstack (nstack res) 1)))))))
+                     (max nlocals (nlocals res)) (+ 2 (nstack res))))))))
