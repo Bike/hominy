@@ -25,6 +25,6 @@
 (defgeneric disassemble (object))
 
 (defmethod disassemble ((obj vm:module))
-  (disassemble-bytecode (bytecode obj)))
+  (disassemble-bytecode (burke/vm:bytecode obj)))
 
 ;; can't do CODE until it has an end point - oops!

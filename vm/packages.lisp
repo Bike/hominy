@@ -2,7 +2,7 @@
   (:use #:cl)
   (:local-nicknames (#:i #:burke/interpreter)
                     (#:o #:burke/vm/ops))
-  (:export #:module #:code #:closure #:enclose))
+  (:export #:module #:bytecode #:code #:closure #:enclose))
 
 (defpackage #:burke/vm/asm
   (:use #:cl)
