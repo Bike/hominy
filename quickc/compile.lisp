@@ -6,65 +6,19 @@
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
                     (#:asm #:burke/vm/asm)
-                    (#:info #:burke/info))
-  (:export #:compile #:empty-cenv #:make-cenv #:make-standard-cenv #:binding)
+                    (#:info #:burke/info)
+                    (#:cenv #:burke/cenv))
+  (:export #:compile)
   (:export #:compilation-module))
 
 (in-package #:burke/quickc)
 
-;;; Info about a variable binding.
-(defclass binding ()
-  ((%info :initarg :info :reader info :type info:info)))
-
 ;;; A locally bound variable.
-(defclass local-binding (binding)
+(defclass local-binding (cenv:binding)
   (;; What function is it local to?
    (%cfunction :initarg :cfunction :reader cfunction)
    ;; Register assignment.
    (%index :initarg :index :reader index)))
-
-(defclass cenvironment ()
-  (;; A list of CENVIRONMENTs.
-   (%parents :initarg :parents :reader parents :type list)
-   ;; An alist (symbol . binding)
-   (%bindings :initarg :bindings :reader bindings :type list)
-   ;; A boolean indicating whether this environment may have additional, unknown bindings.
-   ;; Note that this does not include any parent environments, i.e. a complete
-   ;; cenvironment may have incomplete ancestors.
-   (%completep :initarg :completep :initform t :reader completep :type boolean)))
-
-(defun empty-cenv ()
-  (make-instance 'cenvironment :parents nil :bindings nil))
-
-(defun make-cenv (completep &rest bindings)
-  (make-instance 'cenvironment
-    :parents nil :bindings bindings :completep completep))
-
-;;; FIXME: Needs more definitions, obviously.
-;;; Also FIXME: The constant :: kind of sucks.
-(defun make-standard-cenv ()
-  (make-instance 'cenvironment
-    :parents nil :completep nil
-    :bindings (mapcar (lambda (sym)
-                        (cons sym
-                              (make-instance 'binding
-                                :info (make-instance 'info:known-operative
-                                        :name sym))))
-                      '(syms::$vau))))
-
-;;; Do a simple augmentation - complete, only one parent.
-(defun augment1 (parent bindings)
-  (if (null bindings)
-      parent
-      (make-instance 'cenvironment
-        :parents (list parent) :completep t :bindings bindings)))
-
-(defun lookup (symbol cenv)
-  (let ((pair (assoc symbol (bindings cenv))))
-    (if pair
-        (cdr pair)
-        ;; depth first search, like interpreter environments
-        (some (lambda (cenv) (lookup symbol cenv)) (parents cenv)))))
 
 ;;; Represents information about something that has just been compiled.
 ;;; Name kinda sucks.
@@ -131,13 +85,12 @@
 (defun compilation-module ()
   "Return a Burke environment with bindings for the quick compiler."
   (i:make-fixed-environment
-   '(syms::compile syms::standard-compilation-environment)
+   '(syms::compile)
    (list (i:wrap (i:make-builtin-operative
                   (lambda (env combinand)
                     (declare (ignore env))
                     (destructuring-bind (combiner cenv) combinand
-                      (compile-combiner combiner cenv)))))
-         (make-standard-cenv))))
+                      (compile-combiner combiner cenv))))))))
 
 (defun linearize-plist (plist)
   (etypecase plist
@@ -152,11 +105,12 @@
          ;; because quickc is not smart enough to remove it.
          (_ (asm:closure-index cf cenv))
          (cenv (if (symbolp eparam)
-                   (augment1 cenv
-                             (list (cons eparam (make-instance 'local-binding
-                                                  :cfunction cf
-                                                  :index 1
-                                                  :info (info:default-info)))))
+                   (cenv:augment1 cenv
+                                  (list (cons eparam
+                                              (make-instance 'local-binding
+                                                :cfunction cf
+                                                :index 1
+                                                :info (info:default-info)))))
                    cenv)))
     (declare (ignore _))
     (multiple-value-bind (bindings context nlocals nstack) (gen-plist cf plist)
@@ -198,7 +152,7 @@
                           'o:set 2)
                         (+ 1 llin)))))
              ;; Compile the body.
-             (body (compile-seq body (augment1 cenv bindings) context))
+             (body (compile-seq body (cenv:augment1 cenv bindings) context))
              (info (make-instance 'info:local-operative :data cf))
              (nlocals (+ 3 nlocals (nlocals body)))
              (nstack (max nstack estack (nstack body))))
@@ -290,9 +244,9 @@
     (t (compile-constant form context))))
 
 (defun compile-symbol (symbol cenv context)
-  (let* ((binding (lookup symbol cenv))
+  (let* ((binding (cenv:lookup symbol cenv))
          (info (if binding
-                   (info binding)
+                   (cenv:info binding)
                    (info:default-info))))
     (when (null binding)
       (warn "Unknown variable ~a" symbol))

@@ -34,6 +34,9 @@
 (defclass applicative (info)
   ((%underlying :initarg :underlying :reader unwrap)))
 
+(defun wrap (info)
+  (make-instance 'applicative :underlying info))
+
 (defclass constant (info)
   ((%value :initarg :value :reader value)))
 

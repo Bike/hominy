@@ -20,9 +20,18 @@
            #:join/2 #:meet/2 #:subinfop)
   (:export #:local-operative #:data
            #:known-operative #:name
-           #:applicative #:unwrap
+           #:applicative #:wrap #:unwrap
            #:constant #:value)
   (:export #:type))
+
+(defpackage #:burke/cenv
+  (:use #:cl)
+  (:local-nicknames (#:info #:burke/info)
+                    (#:i #:burke/interpreter))
+  (:export #:binding #:info)
+  (:export #:cenvironment #:empty-cenv #:make-cenv #:make-standard-cenv
+           #:augment1 #:lookup)
+  (:export #:module))
 
 (defpackage #:burke/ir
   (:use #:cl)
