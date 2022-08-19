@@ -4,6 +4,7 @@
 ;; In order to run something like Kildall, they must support meet and join
 ;; operations, as well as a subinfop to determine if propagation should
 ;; continue.
+;; They're also used by the more basic compiler(s).
 ;; Info are computed from other info, or from constants and parameters and
 ;; encloses and stuff.
 ;; FOLLOWING NOT ACTUALLY TRUE AT LEAST YET:
@@ -11,11 +12,30 @@
 ;; of info, each accessible with a different reader. Flow computations can
 ;; use multiple kinds of datum but only output one, i.e. the function that
 ;; computes types is different from the one that computes environment bindings.
+;; Also not sure if it should ever be true. Not the design I settled on for
+;; the abstract interpreter in Cleavir. For now the flow analysis here is
+;; pretty dormant.
 
 (defclass info ()
   ((%type :initarg :type :reader type)))
 
 (defun default-info () (make-instance 'info :type (type:top)))
+
+(defclass local-operative (info)
+  (;; Could be e.g. a cfunction, or other IR for the operative.
+   (%data :initarg :data :reader data)))
+
+;;; Note that we use names instead of directly some handler function etc here
+;;; because these infos are used in different compilers, so we need a little
+;;; bit of indirection.
+(defclass known-operative (info)
+  ((%name :initarg :name :reader name)))
+
+(defclass applicative (info)
+  ((%underlying :initarg :underlying :reader unwrap)))
+
+(defclass constant (info)
+  ((%value :initarg :value :reader value)))
 
 (defgeneric join/2 (info1 info2)
   (:method ((i1 info) (i2 info))

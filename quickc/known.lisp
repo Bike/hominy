@@ -27,11 +27,11 @@
     (assemble context 'o:drop)
     ;; $VAU has no side effects, so outside of a value context do nothing.
     (unless (valuep context)
-      (return-from compile-$vau (result (make-instance 'ginfo) 0 0)))
+      (return-from compile-$vau (result (info:default-info) 0 0)))
     (let* ((cmod (asm:cmodule (cfunction context)))
            (res (compile-operative plist eparam body cenv cmod))
            (info (info res))
-           (cf (cfunction info))
+           (cf (info:data info))
            (cfi (asm:constant-index cf cmod)))
       (cond ((zerop (length (asm:closed cf)))
              ;; not a closure, so just use a constant.

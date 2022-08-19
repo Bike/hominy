@@ -18,6 +18,10 @@
   (:shadow #:type)
   (:export #:info #:default-info
            #:join/2 #:meet/2 #:subinfop)
+  (:export #:local-operative #:data
+           #:known-operative #:name
+           #:applicative #:unwrap
+           #:constant #:value)
   (:export #:type))
 
 (defpackage #:burke/ir

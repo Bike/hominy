@@ -5,55 +5,16 @@
                     (#:syms #:burke/interpreter/syms)
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
-                    (#:asm #:burke/vm/asm))
+                    (#:asm #:burke/vm/asm)
+                    (#:info #:burke/info))
   (:export #:compile #:empty-cenv #:make-cenv #:make-standard-cenv #:binding)
   (:export #:compilation-module))
 
 (in-package #:burke/quickc)
 
-;;; Info about a value known at compile time.
-(defclass info () ())
-
-(defgeneric info-type (info))
-
-(defclass ginfo (info) ; generic info
-  (;; TODO: Type objects
-   (%type :initform t :initarg :type :reader info-type)))
-
-(defclass local-operative-info (info)
-  ((%cfunction :initarg :cfunction :reader cfunction)
-   (%ret-info :initarg :ret :reader ret-info :type info)))
-
-;;; Note that we use names instead of directly compile-$vau etc here because
-;;; eventually, these infos will hopefully be usable in the other compilers,
-;;; so we need a little bit of indirection.
-(defclass known-operator-info (info)
-  ((%name :initarg :name :reader name)))
-
-(defmethod info-type ((info local-operative-info))
-  ;; I'm just making up these types as I go along.
-  `(operative * * ,(info-type (ret-info info))))
-
-(defclass applicative-info (info)
-  ((%underlying :initarg :underlying :reader underlying)))
-
-(defmethod info-type ((info applicative-info))
-  `(applicative ,(info-type (underlying info))))
-
-(defclass constant-info (info)
-  ((%value :initarg :value :reader value)))
-
-(defmethod info-type ((info constant-info))
-  ;; Probably don't actually want eql types in this compiler.
-  `(eql ,(value info)))
-
-(defun applicative-type-p (type) (and (consp type) (eq (first type) 'applicative)))
-(defun applicative-type-underlying (type) (second type))
-(defun operative-type-p (type) (and (consp type) (eq (first type) 'operative)))
-
 ;;; Info about a variable binding.
 (defclass binding ()
-  ((%info :initarg :info :reader info)))
+  ((%info :initarg :info :reader info :type info:info)))
 
 ;;; A locally bound variable.
 (defclass local-binding (binding)
@@ -87,7 +48,7 @@
     :bindings (mapcar (lambda (sym)
                         (cons sym
                               (make-instance 'binding
-                                :info (make-instance 'known-operator-info
+                                :info (make-instance 'info:known-operative
                                         :name sym))))
                       '(syms::$vau))))
 
@@ -99,14 +60,16 @@
         :parents (list parent) :completep t :bindings bindings)))
 
 (defun lookup (symbol cenv)
-  ;; FIXME: Parents
   (let ((pair (assoc symbol (bindings cenv))))
-    (if pair (cdr pair) pair)))
+    (if pair
+        (cdr pair)
+        ;; depth first search, like interpreter environments
+        (some (lambda (cenv) (lookup symbol cenv)) (parents cenv)))))
 
 ;;; Represents information about something that has just been compiled.
 ;;; Name kinda sucks.
 (defclass result ()
-  ((%info :initarg :info :reader info)
+  ((%info :initarg :info :reader info :type info:info)
    ;; How many locals it binds.
    (%nlocals :initarg :nlocals :reader nlocals :type (and unsigned-byte fixnum))
    ;; How much stack space it needs.
@@ -143,7 +106,7 @@
 (defun compile (plist eparam body cenvironment environment)
   (let* ((result (compile-operative plist eparam body cenvironment
                                     (make-instance 'asm:cmodule)))
-         (cfunction (cfunction (info result)))
+         (cfunction (info:data (info result)))
          (code (asm:link cfunction)))
     (vm:enclose code
                 (coerce
@@ -193,7 +156,7 @@
                              (list (cons eparam (make-instance 'local-binding
                                                   :cfunction cf
                                                   :index 1
-                                                  :info (make-instance 'ginfo)))))
+                                                  :info (info:default-info)))))
                    cenv)))
     (declare (ignore _))
     (multiple-value-bind (bindings context nlocals nstack) (gen-plist cf plist)
@@ -236,8 +199,7 @@
                         (+ 1 llin)))))
              ;; Compile the body.
              (body (compile-seq body (augment1 cenv bindings) context))
-             (info (make-instance 'local-operative-info
-                     :cfunction cf :ret (info body)))
+             (info (make-instance 'info:local-operative :data cf))
              (nlocals (+ 3 nlocals (nlocals body)))
              (nstack (max nstack estack (nstack body))))
         (setf (asm:nlocals cf) nlocals (asm:nstack cf) nstack)
@@ -259,7 +221,7 @@
        (values (list (cons plist (make-instance 'local-binding
                                    :cfunction cfunction
                                    :index 0
-                                   :info (make-instance 'ginfo))))
+                                   :info (info:default-info))))
                context 0 0))
       (i:ignore (values nil context 0 0))
       (cons ; this is the hard part.
@@ -278,7 +240,7 @@
                          (values (list (cons plist (make-instance 'local-binding
                                                      :cfunction cfunction
                                                      :index l
-                                                     :info (make-instance 'ginfo))))
+                                                     :info (info:default-info))))
                                  0)))
                       (cons
                        (let ((cons-local next-temp-local))
@@ -318,8 +280,8 @@
   (cond ((valuep context)
          (assemble context 'o:const (constant-index value context))
          (when (tailp context) (assemble context 'o:return))
-         (result (make-instance 'constant-info :value value) 0 1))
-        (t (result (make-instance 'constant-info :value value) 0 0))))
+         (result (make-instance 'info:constant :value value) 0 1))
+        (t (result (make-instance 'info:constant :value value) 0 0))))
 
 (defun compile-form (form cenv context)
   (typecase form
@@ -331,7 +293,7 @@
   (let* ((binding (lookup symbol cenv))
          (info (if binding
                    (info binding)
-                   (make-instance 'ginfo))))
+                   (info:default-info))))
     (when (null binding)
       (warn "Unknown variable ~a" symbol))
     (cond ((not (valuep context)) (return-from compile-symbol (result info 0 0)))
@@ -352,11 +314,11 @@
   (let* ((combinerr (compile-form combinerf cenv (context context :valuep t :tailp nil)))
          (combineri (info combinerr))
          (cres
-           (cond ((and (typep combineri 'known-operator-info)
+           (cond ((and (typep combineri 'info:known-operative)
                        ;; We know what this is, so try something special.
                        ;; This can return NIL, in which case we have to try
                        ;; something else.
-                       (compile-known-operation (name combineri)
+                       (compile-known-operation (info:name combineri)
                                                 combinand cenv context)))
                  (t (compile-general-combination combinand cenv context)))))
     (result (info cres)
@@ -375,4 +337,4 @@
           ((valuep context) (assemble context 'o:combine))
           (t (assemble context 'o:combine 'o:drop)))
     ;; +1 for env reference.
-    (result (make-instance 'ginfo) (nlocals res) (+ (nstack res) 1))))
+    (result (info:default-info) (nlocals res) (+ (nstack res) 1))))
