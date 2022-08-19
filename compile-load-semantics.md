@@ -38,9 +38,9 @@ Infos can also contain just types. TODO.
 
 ## Compilation Semantics
 
-Compiled operatives behave identically to their interpreted counterparts, i.e. with the usual language semantics, as long as the compilation environment's assumptions hold true for the operative's static environent. They are functionally indistinguishable, and compilation is transparent.
+Compiled operatives behave identically to their interpreted counterparts, i.e. with the usual language semantics, as long as the compilation environments the compiler used truly reflect their corresponding runtime environments. Compiled operatives are functionally indistinguishable from uncompiled operatives: compilation is transparent.
 
-If the compilation environment's assumptions no longer hold, the effects are undefined in unsafe code. For example, this could happen if a symbol was incompatibly redefined. In safe code, either the program behaves as though the old compatible definition was in place, as if the new definition was in place, or it signals an error.
+If a compilation environment's assumptions no longer hold, the effects are undefined in unsafe code. For example, this could happen if a symbol was incompatibly redefined. In safe code, either the program behaves as though the old compatible definition was in place, as if the new definition was in place, or it signals an error.
 
 ## Run-time compilation
 
@@ -48,27 +48,55 @@ The basic interface to the compiler is the `compile` applicative. `compile` acce
 
 `compiled-operative` is defined as though it builds an operative normally (with `$vau`) and then compiles it in the given compilation environment, i.e. `(compiled-operative cenv static-env plist eparam body)` = `(compile (eval (list* $vau plist eparam body) static-env) cenv)`. It is provided for convenience, and for efficiency as the implementation may in this circumstance run the compiler directly without producing an intermediate and immediately discarded interpreted operative.
 
+## Evaluation Environments
+
+The compiler may at times wish to evaluate certain forms, such as those for constant macros or constants generally. These evaluations are carried out in a _evaluation environment_ used by the compiler. The evaluation environment is an actual environment (`environment?` is true). It cannot be explicitly passed in, in order to promote concordance with the compilation environment and runtime environment. Instead, the evaluation environment for a future runtime environment is essentially that runtime environment stripped of information the compiler cannot know. For example, in `($let (...) ($foo))`, if `($foo)` was somehow to be evaluated by the compiler, that evaluation would take place in the same evaluation environment as that of the whole `$let` form, because the compiler cannot in general know the runtime values that will be bound by the `$let` in the future.
+
+In more detail, the evaluation environment corresponding to the static environment of the operative being compiled is an immutable copy of that very environment; otherwise, with exceptions for a few special operatives described in "Local Compilation Environments", the evaluation environment corresponding to any runtime environment is an immutable environment with the bindings present in all evaluation environment's corresponding to the runtime environment's parents and no others. For example, if A will be a child of B, the evaluation environment corresponding to A is indistinguishable from that of B, and in particular does not have any new bindings A might, unless A happens to be defined by one of those special operatives.
+
+(FIXME: Confusing. Might be too vague. It's kind of hard to formalize my conception here, especially given that a runtime environment might be a total mystery to the compiler. But in that case the compiler probably won't be evaluating any constants in it anyway.)
+
 ## Local Compilation Environments
+
+Some operatives are specially known to the compiler, and locally alter the compilation and/or evaluation environments.
+
+The most basic of these is the `$clet` family, also including `$clet*` and `$cletrec`. These operatives are identical to their counterparts in the core library, except that they produce immutable fixed environments (note to self: `$let` allows mutation but not new bindings, properly), and that they can be specially treated by the compiler. The compiler evaluates the value forms in its evaluation environment, and can treat the bindings as constant. That is, the compilation environment corresponding to the `$clet`/etc.'s new environment then contains `constant-info`s with those values for those symbols, and the corresponding evaluation environment has those bindings.
+
+Since `$clet` value forms can be evaluated in the runtime environment and/or the compiler's evaluation environment, they should be written to make this safe. For example, if a value form references an outer `$let` binding, evaluation of it by the compiler may result in an error.
+
+(This seems a little restrictive on the compiler - like it can't simply _ignore_ `$clet` bindings if it doesn't want to bother, or doesn't exist at all - except that there are no evaluations the compiler is ever actually required to perform. A compiler treating `$clet` exactly like `$let` would be fine, as would a compiler ignoring it except to keep track of which symbols it binds, and then not performing any evaluations that would have those symbols free.)
+
+(`$cletrec` fundamentally corresponds to `cl:macrolet`. Since useful macros to the compiler are essentially just constants, being able to bind other constants is the obvious generalization.)
+
+`$clet` stands for "compiler let" or "constant let".
 
 There should be a way to interleave normal code with notes only relevant to the compiler, as with `cl:declare`. I have not considered this in detail yet.
 
 ## Macros
 
-A _macro_ is a particular kind of operative that can be processed easily and efficiently by the compiler. Macro operatives have the general form: `($vau combinand dynenv (eval ((wrap [macroexpander]) combinand dynenv) dynenv))`. In other words, their action consists of producing some form based on their combinand and dynenv (the "macroexpander" form), and evaluating that form in the current dynenv. Assuming the macroexpander does not have side effects, macro forms can be compiled by simply inserting the produced form in place of the original.
+A _macro_ is a particular kind of operative that can be processed easily and efficiently by the compiler. Macro operatives have the general form: `($vau combinand dynenv (eval ((wrap [macroexpander]) combinand) dynenv))`. In other words, their action consists of producing some form based on their combinand (the "macroexpander" form), and evaluating that form in the current dynenv. Assuming the macroexpander does not have side effects, macro forms can be compiled by simply inserting the produced form in place of the original.
+
+More generally, a macro can depend on information in the compilation environment; this can be passed as a second argument to the macroexpander.
 
 Macros are operatives (`operative?` is true) as well as macros (`macro?`). The underlying _macro expander_ for a macro can be retrieved with `macroexpander`.
 
-Macros can be produced using the `$macro` operative, or at a lower level with the `macro` applicative. `(macro expander)` produces a macro that uses `expander`, a combiner, as its macroexpander. `($macro combinand dynenv form)` produces a macro which evaluates the `form` to produce its expansion. `($macro combinand dynenv form)` = `(macro ($vau (combinand dynenv) #ignore form))`.
+Macros can be produced using the `$macro` operative, or at a lower level with the `macro` applicative. `(macro expander)` produces a macro that uses `expander`, a combiner, as its macroexpander. `($macro combinand compilation-env form)` produces a macro which evaluates the `form` to produce its expansion. `($macro combinand compilation-env form)` = `(macro ($vau (combinand compilation-env) #ignore form))`.
 
 Semantically, the difference between a macro and the equivalent non-macro operative is that macroexpansion may take place any number of times, and at any time. That is, a conforming program cannot expect that a macro is only expanded once when it is combined, whereas it can with the non-macro. This is the case regardless of whether a macro form is being evaluated or compiled. This means that a conforming program should not rely on macros to perform side effects at any particular time. Ideally, macroexpanders should be pure functions.
 
-The compiler can only take advantage of macroexpansions if it knows about them, i.e. if the compilation environment includes the macro somehow, as by in a `constant-info`.
+If a macro form is expanded by the compiler, the macroexpander must be combined with the combinand and the compilation environment in the evaluation environment corresponding to the future runtime environment of the macro form.
+
+Because macros can be expanded by the evaluator, they should be prepared to receive an empty compilation environment. Most macros will not need access to the compilation environment regardless.
+
+The compiler can only take advantage of macroexpansions if it knows about them, i.e. if the compilation environment includes the macro somehow, as by in a `constant-info`, possibly conveniently bound by `$clet`.
 
 (The semantics of macros in evaluated and compiled code are identical to promote the transparent compilation semantics. I don't think minimal compilation in the CL sense is actually all that useful in practice except I guess as motivation to make the compiler actually compile, but like, who puts side effects in macros anyway? Also, expanding all macros is impossible in Burke. `load-time-value` is genuinely different, but pretty marginal.)
 
+(I am not totally sure what a macro would do with the compilation environment, or for that matter the evaluation environment. Fancy macros could perhaps use type information and stuff, but that runs into similar problems to doing that with compiler macros in CL.)
+
 ## Compile Time Values
 
-The operative `$compile-time-value` is treated differently by the evaluator and the compiler. To the evaluator, it is almost an identity: it could be defined by `($vau (form) #ignore (eval form (make-standard-environment)))`. The compiler (that is, with its standard info) however, may evaluate the form in a standard environment at compile time, and substitute the resulting value for the form.
+The operative `$compile-time-value` is treated differently by the evaluator and the compiler. To the evaluator, it is almost an identity: it could be defined by `($vau (form) #ignore (eval form (make-standard-environment)))`. The compiler (that is, with its standard info) however, may evaluate the form in the evaluation environment at compile time, and substitute the resulting value for the form.
 
 (I think Common Lisp's `load-time-value` versus `#.` isn't relevant to Burke, since essentially all objects should be serializable, and if you want side effects at load time please reconsider and also load-time-value is inappropriate. Sometimes people do use it like "static" locals in C - might be worth considering, I guess.)
 
@@ -150,6 +178,10 @@ This last case is why the linking is done not just with respect to the environme
 
 Shutt's notes on `$binds?` mention that the programmer should be unable to get a complete list of variables bound by an environment, but that the capability to enumerate such a list is not a problem. The requirements of linkage allow programmers to determine whether a given **value** is bound to some variable in an environment, by careful use of marshaling and unmarshaling using that environment as the linkage environment. But similarly to `$binds?`, this would only allow an enumeration procedure.
 
+# Dynamic Contexts
+
+(More thoughts than anything coherent. Some kinds of definition we put in CL files are not really lexical. Most obviously, `defmethod`, but also other kinds of custom definition that add a name to a hash table or whatever. `defmethod` cannot reasonably be said to do anything lexical, because if a library calls a generic function, and the user program defines a method on that generic function, the library is expected to use the program method even though the library's lexical environment certainly did not contain it. I think these definitions may need to be rolled into a third kind of thing besides the module and the compilation environment. Maybe it could be generally like ContextL.)
+
 # Putting It All Together
 
 `compile-file` is then the following series of operations:
@@ -158,3 +190,5 @@ Shutt's notes on `$binds?` mention that the programmer should be unable to get a
 2. Interpret those directives into a module
 3. Marshal that module to a byte stream
 4 ...outputting to a FASL file.
+
+`compile-file` does this all at once. This means it can skip some steps if it doesn't need to do them; for example it could not bother producing a module, and instead serialize directly, as CL implementations do now.
