@@ -5,7 +5,8 @@
   ((%cfunctions :initform nil :accessor cfunctions :type list)
    (%constants :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader constants)))
 
-(defun constant-index (value cmodule)
+(defgeneric constant-index (thing value))
+(defmethod constant-index ((cmodule cmodule) value)
   (let ((constants (constants cmodule)))
     (or (position value constants)
         (vector-push-extend value constants))))
@@ -28,6 +29,8 @@
 (defun closure-index (cfunction thing)
   (or (position thing (closed cfunction))
       (vector-push-extend thing (closed cfunction))))
+(defmethod constant-index ((cfunction cfunction) value)
+  (constant-index (cmodule cfunction) value))
 
 (defun nbytes (cfunction) (length (bytecode cfunction)))
 

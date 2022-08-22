@@ -55,7 +55,7 @@
   (apply #'asm:assemble (cfunction context) items))
 
 (defun constant-index (value context)
-  (asm:constant-index value (asm:cmodule (cfunction context))))
+  (asm:constant-index (asm:cmodule (cfunction context)) value))
 
 (defun compile (plist eparam body cenvironment environment)
   (let* ((result (compile-operative plist eparam body cenvironment
