@@ -4,7 +4,7 @@
 ;;; This is an object instead of just the info because compilers may
 ;;; subclass it to store other, compiler-specific information.
 (defclass binding ()
-  ((%info :initarg :info :reader info :type info:info)))
+  ((%info :initarg :info :initform (info:default-info) :reader info :type info:info)))
 
 (defclass cenvironment ()
   (;; A list of CENVIRONMENTs.
