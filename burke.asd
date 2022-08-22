@@ -25,6 +25,15 @@
     :depends-on ("compilation-environment" "info" "vm" "interpreter")
     :components ((:file "compile")
                  (:file "known" :depends-on ("compile"))))
+   (:module "treec"
+    :depends-on ("compilation-environment" "info" "vm" "interpreter")
+    :components ((:file "packages")
+                 (:file "plist" :depends-on ("packages"))
+                 (:file "ir" :depends-on ("packages"))
+                 (:file "free" :depends-on ("ir"))
+                 (:file "front" :depends-on ("ir" "free" "packages"))
+                 (:file "back" :depends-on ("ir" "packages"))
+                 (:file "compile" :depends-on ("front" "back" "packages"))))
    (:module "ir"
     :depends-on ("info" "packages")
     :components ((:file "ir")
