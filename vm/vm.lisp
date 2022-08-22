@@ -62,6 +62,7 @@
       (ecase (code)
         ((#.o:nop) (incf ip))
         ((#.o:drop) (spop) (incf ip))
+        ((#.o:dup) (let ((o (spop))) (spush o) (spush o)) (incf ip))
         ((#.o:ref) (spush (reg (next-code))) (incf ip))
         ((#.o:set) (setf (reg (next-code)) (spop)) (incf ip))
         ((#.o:closure) (spush (closure (next-code))) (incf ip))

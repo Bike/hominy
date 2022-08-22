@@ -13,7 +13,7 @@
                                    (loop repeat n collect (aref bytecode (incf pc))))
                            (incf pc))))
                   (ecase (car pair)
-                    ((o:nop o:drop o:cons o:car o:cdr o:return
+                    ((o:nop o:drop o:dup o:cons o:car o:cdr o:return
                             o:combine o:tail-combine o:lookup
                             o:err-if-not-cons o:err-if-not-null)
                      (fixed 0))

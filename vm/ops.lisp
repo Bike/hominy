@@ -18,7 +18,7 @@
                   (defparameter ,(find-symbol "*OPS*" "BURKE/VM/OPS") ',map)
                   ,@(loop for (sym . i) in map
                           collect `(defconstant ,sym ,i))))))
-  (def nop drop
+  (def nop drop dup
     ref set closure const
     cons list car cdr
     return jump jump-if-true
