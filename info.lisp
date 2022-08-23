@@ -21,6 +21,10 @@
 
 (defun default-info () (make-instance 'info :type (type:top)))
 
+;;; Get the info you'd have from unwrapping the given info.
+(defgeneric unwrap (info))
+(defmethod unwrap ((info info)) (default-info))
+
 (defclass local-operative (info)
   (;; Could be e.g. a cfunction, or other IR for the operative.
    (%data :initarg :data :reader data)))
