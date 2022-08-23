@@ -69,3 +69,10 @@
 (defun make-seq (for-effect final)
   (make-instance 'seq :for-effect for-effect :final final))
 (defmethod info ((node seq)) (info (final node)))
+
+(defclass ifn (node)
+  ((%condition :initarg :condition :reader if-cond :type node)
+   (%then :initarg :then :reader then :type node)
+   (%else :initarg :else :reader else :type node)))
+(defun make-if (cond then else) (make-instance 'ifn :condition cond :then then :else else))
+(defmethod info ((node ifn)) (info:default-info)) ; TODO

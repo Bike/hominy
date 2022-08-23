@@ -73,6 +73,8 @@
   (let* ((combinern (convert-form (car form) env-var cenv))
          (combineri (info combinern)))
     (etypecase combineri
+      (info:known-operative
+       (convert-known-operation (info:name combineri) combinern (cdr form) env-var cenv))
       (info:applicative
        ;; TODO: Probably need to recurse somehow for known applicatives.
        (make-combination (make-unwrap combinern)

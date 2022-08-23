@@ -31,7 +31,8 @@
                  (:file "plist" :depends-on ("packages"))
                  (:file "ir" :depends-on ("packages"))
                  (:file "free" :depends-on ("ir"))
-                 (:file "front" :depends-on ("ir" "free" "packages"))
+                 (:file "known" :depends-on ("ir"))
+                 (:file "front" :depends-on ("known" "ir" "free" "packages"))
                  (:file "back" :depends-on ("ir" "packages"))
                  (:file "compile" :depends-on ("front" "back" "packages"))))
    (:module "ir"
