@@ -22,6 +22,14 @@
    (%valuep :initform t :initarg :valuep :reader valuep :type boolean)
    (%tailp :initform t :initarg :tailp :reader tailp :type boolean)))
 
+(defmethod print-object ((ctxt context) stream)
+  (print-unreadable-object (ctxt stream :type t)
+    (when (valuep ctxt)
+      (write (if (tailp ctxt) :tailp :valuep) :stream stream)
+      (write-char #\Space stream))
+    (format stream "~a ~d ~a ~d" :nregs (nregs ctxt) :nstack (nstack ctxt)))
+  ctxt)
+
 (defun context (context
                 &key (new-regs 0) (new-stack 0)
                   (valuep (valuep context)) (tailp (tailp context)))
@@ -100,12 +108,32 @@
   (translate (combiner node) (context context :valuep t :tailp nil))
   (translate (combinand node) (context context :valuep t :tailp nil :new-stack 1))
   (translate (env node) (context context :valuep t :tailp nil :new-stack 2))
-  (if (tailp context)
-      (asm:assemble (cfunction context) 'o:tail-combine)
-      (asm:assemble (cfunction context) 'o:combine 'o:return)))
+  (asm:assemble (cfunction context) (if (tailp context) 'o:tail-combine 'o:combine)))
 
 (defmethod translate ((node seq) context)
   (loop with fecontext = (context context :valuep nil)
         for node in (for-effect node)
         do (translate node fecontext))
   (translate (final node) context))
+
+(defmethod translate ((node listn) context)
+  (when (valuep context)
+    (let ((elemnodes (elements node))
+          (cf (cfunction context)))
+      (cond ((null elemnodes)
+             ;; Constant
+             (mark-stack (1+ (nstack context)))
+             (asm:assemble cf 'o:const (asm:constant-index cf ())))
+            (t
+             (loop for i from 0 for node in elemnodes
+                   for ctx = (context context :new-stack i :valuep t :tailp nil)
+                   do (translate node ctx))
+             (asm:assemble cf 'o:list (length elemnodes))))
+      (when (tailp context) (asm:assemble cf 'o:return)))))
+
+(defmethod translate ((node unwrap) context)
+  (when (valuep context)
+    (let ((cf (cfunction context)))
+      (translate (applicative node) (context context :valuep t :tailp nil))
+      (asm:assemble cf 'o:unwrap)
+      (when (tailp context) (asm:assemble cf 'o:return)))))

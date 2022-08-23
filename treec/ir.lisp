@@ -50,6 +50,17 @@
   ;; TODO?
   (info:default-info))
 
+;; Production of a list of arguments for an applicative combination.
+(defclass listn (node)
+  ((%elements :initarg :elements :reader elements :type list)))
+(defun make-listn (elements) (make-instance 'listn :elements elements))
+(defmethod info ((node listn)) (info:default-info)) ; TODO
+
+(defclass unwrap (node)
+  ((%applicative :initarg :applicative :reader applicative :type node)))
+(defun make-unwrap (app) (make-instance 'unwrap :applicative app))
+(defmethod info ((node unwrap)) (info:unwrap (info (applicative node))))
+
 (defclass seq (node)
   (;; A list of nodes for the forms evaluated for-effect.
    (%for-effect :initarg :for-effect :reader for-effect :type list)

@@ -22,7 +22,7 @@
 
 (defun convert-operative (plist eparam body cenv)
   (let* ((bindings (operative-bindings plist eparam))
-         (cenv (apply #'cenv:make-cenv cenv bindings))
+         (cenv (cenv:augment1 cenv bindings))
          (env-var (make-symbol "LOCAL-ENVIRONMENT"))
          (bodyn (convert-seq body env-var cenv))
          (free (free bodyn))
@@ -73,6 +73,13 @@
   (let* ((combinern (convert-form (car form) env-var cenv))
          (combineri (info combinern)))
     (etypecase combineri
+      (info:applicative
+       ;; TODO: Probably need to recurse somehow for known applicatives.
+       (make-combination (make-unwrap combinern)
+                         (make-listn
+                          (loop for form in (cdr form)
+                                collect (convert-form form env-var cenv)))
+                         (make-ref env-var)))
       (t (make-combination combinern
                            (convert-constant (cdr form) env-var cenv)
                            (make-ref env-var))))))

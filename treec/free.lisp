@@ -9,3 +9,8 @@
 (defmethod free ((combination combination))
   (append (free (combiner combination)) (free (combinand combination))
           (free (env combination))))
+(defmethod free ((node listn))
+  (reduce #'union (elements node) :key #'free))
+(defmethod free ((node unwrap)) (free (applicative node)))
+(defmethod free ((seq seq))
+  (union (free (final seq)) (reduce #'union (for-effect seq) :key #'free)))
