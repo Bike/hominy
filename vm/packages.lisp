@@ -9,7 +9,7 @@
   (:shadow #:disassemble)
   (:local-nicknames (#:vm #:burke/vm)
                     (#:o #:burke/vm/ops))
-  (:export #:assemble #:link)
+  (:export #:assemble #:link #:make-label #:emit-label)
   (:export #:cmodule #:constant-index #:closure-index
            #:cfunction #:sep #:nlocals #:nstack #:closed #:nbytes)
   (:export #:disassemble #:disassemble-bytecode))

@@ -11,7 +11,7 @@
     (or (position value constants)
         (vector-push-extend value constants))))
 
-;;;A function (operative) being compiled.
+;;; A function (operative) being compiled.
 (defclass cfunction ()
   ((%cmodule :initarg :cmodule :initform (error "missing arg") :reader cmodule :type cmodule)
    (%plist :initarg :plist :initform (error "missing arg") :reader plist)
@@ -34,14 +34,33 @@
 
 (defun nbytes (cfunction) (length (bytecode cfunction)))
 
+;;; A reference into the code vector that can't be resolved until linking.
+;;; TODO: Variable size labels and stuff. (Scary.)
+;;; TODO: Cross-operative labeling.
+(defclass label ()
+  (;; The position in the bytecode that needs to be replaced with the actual location.
+   (%fixup :initform nil :accessor label-fixup)))
+
+(defun make-label (cfunction) (declare (ignore cfunction)) (make-instance 'label))
+
 (defun assemble (cfunction &rest items)
   (loop with bytecode = (bytecode cfunction)
         for item in items
         do (etypecase item
              (symbol ; treat as an instruction name
               (vector-push-extend (symbol-value item) bytecode))
+             (label
+              (assert (null (label-fixup item))) ; no dupe assembly
+              (setf (label-fixup item) (vector-push-extend 0 bytecode)))
              ((unsigned-byte 8) ; literal constant
               (vector-push-extend item bytecode)))))
+
+(defun emit-label (cfunction label)
+  (let* ((fixup (label-fixup label))
+         (diff (- (nbytes cfunction) fixup)))
+    (if (typep diff '(signed-byte 7))
+        (setf (aref (bytecode cfunction) fixup) (ldb (byte 8 0) diff))
+        (error "Diff too big: ~d" diff))))
 
 ;;; Produce a vm:module and vm:codes from cfunction and its module, by resolving any
 ;;; unresolved labels (when that's a thing), concatenating the bytecode vector, etc.
