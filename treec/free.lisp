@@ -16,3 +16,11 @@
   (union (free (final seq)) (reduce #'union (for-effect seq) :key #'free)))
 (defmethod free ((ifn ifn))
   (union (free (if-cond ifn)) (union (free (then ifn)) (free (else ifn)))))
+(defmethod free ((op operative))
+  ;; This whole thing kind of betrays a suboptimality of the tree compiler-
+  ;; we might later find that a variable is not actually used and so we don't need
+  ;; to close over it. But the tree compiler is not smart enough to realize.
+  ;; Fixing this is left to the final flow compiler.
+  (operative-free op))
+(defmethod free ((op enclose))
+  (adjoin (env-var op) (free (operative op))))

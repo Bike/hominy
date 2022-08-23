@@ -9,12 +9,27 @@
   ((%plist :initarg :plist :reader plist)
    (%eparam :initarg :eparam :reader eparam)
    (%body :initarg :body :reader body :type node)
-   ;; Either a list of free lvars, or a single lvar. In the latter case, what is meant
-   ;; is that the environment itself is used freely, and the lvar is bound to it.
-   (%free :initarg :free :reader operative-free :type (or lvar list))))
+   ;; A list of free symbols.
+   (%free :initarg :free :reader operative-free :type list)
+   ;; True iff the operative uses its static environment arbitrarily
+   ;; (i.e. if it needs to be reified by the encloser)
+   (%closes-env-p :initarg :closes-env-p :reader closes-env-p :type boolean)
+   ;; A symbol uses internally to refer to the local environment.
+   (%env-var :initarg :env-var :reader env-var :type symbol)))
 (defmethod info ((node operative))
   ;; TODO
   (info:default-info))
+
+;;; Indicator that an operative needs a reified environment.
+;;; This essentially exists so that FREE can get at the appropriate env-var.
+;;; A lack of ENCLOSE does not mean that the operative won't have to be a closure,
+;;; just that it doesn't have to close over its static environment.
+(defclass enclose (node)
+  ((%operative :initarg :operative :reader operative :type operative)
+   (%env-var :initarg :env-var :reader env-var :type symbol)))
+(defun make-enclose (operative env-var)
+  (make-instance 'enclose :operative operative :env-var env-var))
+(defmethod info ((node enclose)) (info (operative node)))
 
 ;; Reference to a "global" variable, i.e. one not bound within the operative being
 ;; compiled, i.e. from its static environment.

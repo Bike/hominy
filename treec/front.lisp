@@ -25,17 +25,15 @@
          (cenv (cenv:augment1 cenv bindings))
          (env-var (make-symbol "LOCAL-ENVIRONMENT"))
          (bodyn (convert-seq body env-var cenv))
-         (free (free bodyn))
-         ;; What variables are free in this operative that are not bound by it.
-         (really-free
-           (if (member env-var free)
-               ;; the environment is free, so we need everything
-               env-var
-               ;; Subtract out variables we bind
-               (set-difference free (mapcar #'car bindings)))))
+         (free (free bodyn)))
+    (multiple-value-bind (really-free closes-env-p)
+        (if (member env-var free)
+            (values (delete env-var (nset-difference free (mapcar #'car bindings))) t)
+            (values (nset-difference free (mapcar #'car bindings)) nil))
       (make-instance 'operative
-        :plist plist :eparam eparam :free really-free
-        :body (convert-seq body env-var cenv))))
+        :plist plist :eparam eparam
+        :free really-free :closes-env-p closes-env-p :env-var env-var
+        :body (convert-seq body env-var cenv)))))
 
 (defun convert-seq (forms env-var cenv)
   (cond ((null forms) (convert-constant i:inert env-var cenv))

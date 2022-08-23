@@ -46,12 +46,12 @@
   (let* ((cf (make-instance 'asm:cfunction
                :plist (plist operative) :eparam (eparam operative)
                :cmodule cmodule))
-         (free (operative-free operative)))
+         (closes-env-p (closes-env-p operative)))
     (multiple-value-bind (locals plist-nregs plist-nstack)
         (gen-operative-bindings cf (plist operative) (eparam operative)
-                                (if (symbolp free) free nil))
+                                (if closes-env-p (env-var operative) nil))
       (setf (asm:sep cf) (asm:nbytes cf))
-      (when (typep free '(and symbol (not null)))
+      (when closes-env-p
         ;; if the environment is reified, close over the static environment.
         ;; Note that plist.lisp needs this to be at closure 0.
         (asm:closure-index cf *static-env-link-marker*))
@@ -71,17 +71,20 @@
     (symbol (list plist))
     (cons (append (linearize-plist (car plist)) (linearize-plist (cdr plist))))))
 
+;;; This is separated out from the TRANSLATE on REF because it's also used by the
+;;; translation for operative nodes, and when mutation is reintroduced, that will
+;;; have to do something slightly different.
+(defun symbol-binding (symbol context)
+  (let ((lpair (assoc symbol (locals context)))
+        (cf (cfunction context)))
+    (cond (lpair (asm:assemble cf 'o:ref (cdr lpair)))
+          (t (asm:assemble cf 'o:closure (asm:closure-index cf symbol))))))
+
 (defmethod translate ((node ref) context)
   (when (valuep context)
     (mark-stack (1+ (nstack context)))
-    (let* ((cfunction (cfunction context))
-           (symbol (ref-symbol node))
-           (lpair (assoc symbol (locals context))))
-      (cond (lpair
-             (asm:assemble cfunction 'o:ref (cdr lpair)))
-            (t
-             (asm:assemble cfunction 'o:closure (asm:closure-index cfunction symbol))))
-      (when (tailp context) (asm:assemble cfunction 'o:return)))))
+    (symbol-binding (ref-symbol node) context)
+    (when (tailp context) (asm:assemble (cfunction context) 'o:return))))
 
 (defmethod translate ((node link) context)
   (when (valuep context)
@@ -153,3 +156,23 @@
     (asm:emit-label cf thenl)
     (translate (then node) rcontext)
     (unless tailp (asm:emit-label cf mergel))))
+
+(defmethod translate ((node operative) context)
+  (when (valuep context)
+    (let* ((cf (cfunction context))
+           (opcf (translate-operative node (link-env context) (asm:cmodule cf)))
+           (free (operative-free node))
+           ;; If we're inside an ENCLOSE node, that pushed the static env and left
+           ;; the rest to us. (KLUDGE)
+           (nclosed (if (closes-env-p node) (1+ (length free)) (length free))))
+      (mark-stack (+ nclosed (nstack context)))
+      (loop for var in free
+            do (symbol-binding var context))
+      (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))
+      (when (tailp context) (asm:assemble cf 'o:return)))))
+
+(defmethod translate ((node enclose) context)
+  (when (valuep context)
+    ;; See KLUDGE in TRANSLATE OPERATIVE
+    (symbol-binding (env-var node) context)
+    (translate (operative node) context)))
