@@ -29,11 +29,22 @@
 
 (defclass code (i:operative)
   ((%module :initarg :module :reader module :type module)
+   ;; eXternal Entry Point: An index into the bytecode vector which control can be
+   ;; transferred to to combine the operative with the general calling convention.
    (%xep :initarg :xep :reader xep :type (and unsigned-byte fixnum))
+   ;; Specific Entry Point: An index into the bytecode vector which control can be
+   ;; transferred to to combine the operative with a simpler calling convention
+   ;; peculiar to the operative.
    (%sep :initarg :sep :reader sep :type (and unsigned-byte fixnum))
+   ;; Index into the bytecode where this function ends. Used for debugging.
+   (%end :initarg :end :reader end :type (and unsigned-byte fixnum))
+   ;; Size of the register file needed for this operative.
    (%nregs :initarg :nregs :reader nregs :type (and unsigned-byte fixnum))
+   ;; ...and the stack.
    (%nstack :initarg :nstack :reader nstack :type (and unsigned-byte fixnum))
+   ;; How many slots does a closure need?
    (%nclosed :initarg :nclosed :reader nclosed :type (and unsigned-byte fixnum))
+   ;; Human-readable (but symbolic) name for debugging.
    (%name :initform nil :initarg :name :reader i:name)))
 
 (defclass closure (i:operative)

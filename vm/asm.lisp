@@ -85,13 +85,14 @@
          (module (make-instance 'vm:module
                    :bytecode bytecode :constants constants))
          (codes
-           (loop for xep-start = 0 then (+ xep-start (length fbytecode))
+           (loop for xep-start = 0 then fend
                  for cfunction in cfunctions
                  for fbytecode = (bytecode cfunction)
+                 for fend = (+ xep-start (length fbytecode))
                  do (replace bytecode fbytecode :start1 xep-start)
                  collect (make-instance 'vm:code
                            :module module :xep xep-start :sep (+ xep-start (sep cfunction))
-                           :nregs (nlocals cfunction) :nstack (nstack cfunction)
+                           :end fend :nregs (nlocals cfunction) :nstack (nstack cfunction)
                            :nclosed (length (closed cfunction)) :name (name cfunction)))))
     (loop for i below nconstants
           for cconst = (aref cconstants i)

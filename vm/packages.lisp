@@ -2,7 +2,9 @@
   (:use #:cl)
   (:local-nicknames (#:i #:burke/interpreter)
                     (#:o #:burke/vm/ops))
-  (:export #:module #:bytecode #:code #:closure #:enclose))
+  (:export #:module #:bytecode #:code #:closure #:enclose)
+  ;; needed for disassemble
+  (:export #:xep #:end))
 
 (defpackage #:burke/vm/asm
   (:use #:cl)

@@ -28,17 +28,21 @@
                 o:enclose o:make-environment o:call o:tail-call)
          (fixed 1))))))
 
-(defun disassemble-bytecode (bytecode &key (start 0))
-  (loop with bytecode-len = (length bytecode)
-        with pc = start
+(defun disassemble-bytecode (bytecode &key (start 0) (end (length bytecode)))
+  (loop with pc = start
         for op = (car (rassoc (aref bytecode pc) o:*ops*))
         collect (disassemble-instruction bytecode pc)
         do (incf pc (instruction-length op))
-        until (>= pc bytecode-len)))
+        until (>= pc end)))
 
 (defgeneric disassemble (object))
 
 (defmethod disassemble ((obj vm:module))
   (disassemble-bytecode (burke/vm:bytecode obj)))
 
-;; can't do CODE until it has an end point - oops!
+(defmethod disassemble ((obj vm:closure)) (disassemble (vm:code obj)))
+
+(defmethod disassemble ((obj vm:code))
+  (disassemble-bytecode (burke/vm:bytecode (burke/vm:module obj))
+                        :start (vm:xep obj)
+                        :end (vm:end obj)))
