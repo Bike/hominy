@@ -154,14 +154,18 @@ Signals an error if the symbol is not bound in the environment."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defgeneric name (object)) ; a nice name for printing etc.
+
 (defclass combiner () ())
+(defmethod name ((object combiner)) nil) ; give up
 (defclass operative (combiner) ())
 (defclass builtin-operative (operative)
-  ((%fun :initarg :fun :reader builtin-impl :type function)))
-(defun make-builtin-operative (function)
+  ((%fun :initarg :fun :reader builtin-impl :type function)
+   (%name :initarg :name :reader name)))
+(defun make-builtin-operative (function &optional name)
   "Make an operative implemented as a CL function.
 The function will receive two arguments, the dynamic environment and the combinand."
-  (make-instance 'builtin-operative :fun function))
+  (make-instance 'builtin-operative :fun function :name name))
 (defclass derived-operative (operative)
   ((%plist :initarg :plist :reader plist) 
    (%eparam :initarg :eparam :reader eparam :type (or ignore symbol))
@@ -173,8 +177,11 @@ The function will receive two arguments, the dynamic environment and the combina
    (%augmenter :initarg :augmenter :accessor augmenter :type function)
    ;; A list of forms (not just one form)
    (%body :initarg :body :reader body)))
+(defmethod name ((object derived-operative))
+  `(syms::$vau ,(plist object) ,(eparam object)))
 (defclass applicative (combiner)
   ((%underlying :initarg :underlying :reader unwrap :type combiner)))
+(defmethod name ((app applicative)) (name (unwrap app)))
 
 (defun operativep (object) (typep object 'operative))
 (defun applicativep (object) (typep object 'applicative))
@@ -188,6 +195,12 @@ The function will receive two arguments, the dynamic environment and the combina
          (body combiner)))
 (defmethod combine ((combiner applicative) combinand env)
   (combine (unwrap combiner) (evlis combinand env) env))
+
+(defmethod print-object ((object combiner) stream)
+  (print-unreadable-object (object stream :type t)
+    (let ((name (name object)))
+      (when name (write name :stream stream))))
+  object)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

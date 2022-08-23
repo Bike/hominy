@@ -33,11 +33,13 @@
    (%sep :initarg :sep :reader sep :type (and unsigned-byte fixnum))
    (%nregs :initarg :nregs :reader nregs :type (and unsigned-byte fixnum))
    (%nstack :initarg :nstack :reader nstack :type (and unsigned-byte fixnum))
-   (%nclosed :initarg :nclosed :reader nclosed :type (and unsigned-byte fixnum))))
+   (%nclosed :initarg :nclosed :reader nclosed :type (and unsigned-byte fixnum))
+   (%name :initform nil :initarg :name :reader i:name)))
 
 (defclass closure (i:operative)
   ((%code :initarg :code :reader code)
    (%closed :initarg :closed :reader closed :type simple-vector)))
+(defmethod i:name ((o closure)) (i:name (code o)))
 
 (defun enclose (code closed)
   (make-instance 'closure :code code :closed (coerce closed 'simple-vector)))

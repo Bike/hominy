@@ -21,10 +21,17 @@
    (%nlocals :initform 0 :accessor nlocals :type (and unsigned-byte fixnum))
    (%nstack :initform 0 :accessor nstack :type (and unsigned-byte fixnum))
    (%closed :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader closed
-            :type (array t (*)))))
+            :type (array t (*)))
+   (%name :initform nil :initarg :name :accessor name)))
 
-(defmethod initialize-instance :after ((inst cfunction) &key cmodule &allow-other-keys)
-  (push inst (cfunctions cmodule)))
+(defmethod initialize-instance :after ((inst cfunction) &key cmodule (name nil namep)
+                                       &allow-other-keys)
+  (declare (ignore name))
+  ;; Add the cfunction to the module.
+  (push inst (cfunctions cmodule))
+  ;; Put in a default name if none was provided.
+  (unless namep
+    (setf (name inst) `(burke/interpreter/syms::$vau ,(plist inst) ,(eparam inst)))))
 
 (defun closure-index (cfunction thing)
   (or (position thing (closed cfunction))
@@ -85,7 +92,7 @@
                  collect (make-instance 'vm:code
                            :module module :xep xep-start :sep (+ xep-start (sep cfunction))
                            :nregs (nlocals cfunction) :nstack (nstack cfunction)
-                           :nclosed (length (closed cfunction))))))
+                           :nclosed (length (closed cfunction)) :name (name cfunction)))))
     (loop for i below nconstants
           for cconst = (aref cconstants i)
           do (setf (aref constants i)
