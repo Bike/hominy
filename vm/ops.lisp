@@ -24,4 +24,4 @@
     return jump jump-if-true
     combine tail-combine lookup unwrap enclose make-environment
     call tail-call
-    err-if-not-cons err-if-not-null))
+    err-if-not-cons err-if-not-null err-if-not-bool))

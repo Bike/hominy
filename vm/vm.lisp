@@ -50,7 +50,13 @@
            (type (and unsigned-byte fixnum) ip))
   (flet ((code () (aref bytecode ip))
          (next-code () (aref bytecode (incf ip)))
-         (next-label () (aref bytecode (incf ip))) ; TODO: Longer labels
+         (next-label ()
+           ;; Treat it as an sb7.
+           ;; TODO: Longer labels
+           (let ((raw (aref bytecode (incf ip))))
+             (if (logbitp 7 raw)
+                 (- raw #x100)
+                 raw)))
          (reg (i) (reg frame i))
          ((setf reg) (object i) (setf (reg frame i) object))
          (closure (i) (aref closure i))
@@ -107,6 +113,11 @@
         ((#.o:err-if-not-null)
          (let ((object (spop)))
            (unless (null object) (error 'type-error :datum object :expected-type 'null)))
+         (incf ip))
+        ((#.o:err-if-not-bool)
+         (let ((object (spop)))
+           (unless (typep object 'i:boolean)
+             (error 'type-error :datum object :expected-type 'i:boolean)))
          (incf ip))))))
 
 ;;; CODEs can be used directly as combiners iff they are not closures.

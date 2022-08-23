@@ -4,7 +4,7 @@
   (ecase op
     ((o:nop o:drop o:dup o:cons o:car o:cdr o:return
             o:combine o:tail-combine o:lookup o:unwrap
-            o:err-if-not-cons o:err-if-not-null)
+            o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
      1)
     ((o:ref o:set o:closure o:const o:list o:jump o:jump-if-true
             o:enclose o:make-environment o:call o:tail-call)
@@ -22,7 +22,7 @@
       (ecase (car pair)
         ((o:nop o:drop o:dup o:cons o:car o:cdr o:return
                 o:combine o:tail-combine o:lookup o:unwrap
-                o:err-if-not-cons o:err-if-not-null)
+                o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
          (fixed 0))
         ((o:ref o:set o:closure o:const o:list o:jump o:jump-if-true
                 o:enclose o:make-environment o:call o:tail-call)
