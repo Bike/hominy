@@ -90,7 +90,8 @@
                   (lambda (env combinand)
                     (declare (ignore env))
                     (destructuring-bind (combiner cenv) combinand
-                      (compile-combiner combiner cenv))))))))
+                      (compile-combiner combiner cenv)))
+                  'syms::compile)))))
 
 (defun linearize-plist (plist)
   (etypecase plist

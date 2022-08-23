@@ -33,4 +33,5 @@
                   (lambda (env combinand)
                     (declare (ignore env))
                     (destructuring-bind (combiner cenv) combinand
-                      (compile combiner cenv))))))))
+                      (compile combiner cenv)))
+                  'syms::compile)))))
