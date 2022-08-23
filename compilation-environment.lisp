@@ -30,19 +30,18 @@
     :parents nil :completep nil
     :bindings (flet ((sym (name)
                        (intern name "BURKE/INTERPRETER/SYMS"))
+                     (bi (info) (make-instance 'binding :info info))
                      (ko (sym)
-                       (make-instance 'binding
-                         :info (make-instance 'info:known-operative
-                                 :name sym))))
+                       (make-instance 'info:known-operative :name sym)))
                 (append
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
-                             (cons sym (ko sym))))
+                             (cons sym (bi (ko sym)))))
                          '("$IF" "$VAU"  "$DEFINE!" "$SEQUENCE"
                            "$LET" "$LETREC"))
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
-                             (cons sym (info:wrap (ko sym)))))
+                             (cons sym (bi (info:wrap (ko sym))))))
                          '("EVAL" "COMBINE" "LOOKUP"
                            "ENVIRONMENT?" "MAKE-ENVIRONMENT"
                            "MAKE-FIXED-ENVIRONMENT"
