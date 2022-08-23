@@ -64,7 +64,8 @@
 
 (defun emit-label (cfunction label)
   (let* ((fixup (label-fixup label))
-         (diff (- (nbytes cfunction) fixup)))
+         ;; -1 because jumps are relative to the opcode, not the label.
+         (diff (- (nbytes cfunction) fixup -1)))
     (if (typep diff '(signed-byte 7))
         (setf (aref (bytecode cfunction) fixup) (ldb (byte 8 0) diff))
         (error "Diff too big: ~d" diff))))

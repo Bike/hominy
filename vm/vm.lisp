@@ -63,10 +63,10 @@
            (type (and unsigned-byte fixnum) ip))
   (flet ((code () (aref bytecode ip))
          (next-code () (aref bytecode (incf ip)))
-         (next-label ()
+         (label ()
            ;; Treat it as an sb7.
            ;; TODO: Longer labels
-           (let ((raw (aref bytecode (incf ip))))
+           (let ((raw (aref bytecode (+ ip 1))))
              (if (logbitp 7 raw)
                  (- raw #x100)
                  raw)))
@@ -91,12 +91,12 @@
         ((#.o:car) (spush (car (the cons (spop)))) (incf ip))
         ((#.o:cdr) (spush (cdr (the cons (spop)))) (incf ip))
         ((#.o:return) (return-from vm (spop)))
-        ((#.o:jump) (incf ip (next-label)))
+        ((#.o:jump) (incf ip (label)))
         ((#.o:jump-if-true)
-         (let ((label (next-label)))
+         (let ((label (label)))
            (if (eql (spop) i:true)
                (incf ip label)
-               (incf ip))))
+               (incf ip 2)))) ; skip label
         ((#.o:combine)
          (let ((env (spop)) (combinand (spop)) (combiner (spop)))
            (spush (i:combine combiner combinand env)))
