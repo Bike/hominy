@@ -31,7 +31,7 @@
     (fill-values bindings values new-env)
     (apply #'$sequence new-env body)))
 
-(defun exit () (throw 'abort inert))
+(defun exit (&rest values) (throw 'abort values))
 
 ;;; Returns a function that, given a combinand passed
 ;;; to an operative, returns a new augmentation of static-env with everything
