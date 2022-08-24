@@ -203,6 +203,18 @@ The function will receive two arguments, the dynamic environment and the combina
   object)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Macros: A useful extension Shutt would probably detest.
+
+(defclass macro (operative)
+  ((%expander :initarg :expander :reader expander :type combiner)))
+(defun make-macro (expander) (make-instance 'macro :expander expander))
+(defmethod name ((op macro)) (name (expander op)))
+
+(defmethod combine ((combiner macro) combinand env)
+  (eval (combine (expander combiner) combinand env) env))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass boolean ()
