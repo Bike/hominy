@@ -25,14 +25,18 @@
 (defgeneric unwrap (info))
 (defmethod unwrap ((info info)) (default-info))
 
-(defclass local-operative (info)
+(defclass operative (info)
+  (;; Does the operative use its dynamic environment?
+   (%dynenvp :initform t :initarg :dynenvp :reader dynenvp :type boolean)))
+
+(defclass local-operative (operative)
   (;; Could be e.g. a cfunction, or other IR for the operative.
    (%data :initarg :data :reader data)))
 
 ;;; Note that we use names instead of directly some handler function etc here
 ;;; because these infos are used in different compilers, so we need a little
 ;;; bit of indirection.
-(defclass known-operative (info)
+(defclass known-operative (operative)
   ((%name :initarg :name :reader name)))
 
 (defclass applicative (info)

@@ -18,7 +18,8 @@
   (:shadow #:type)
   (:export #:info #:default-info
            #:join/2 #:meet/2 #:subinfop)
-  (:export #:local-operative #:data
+  (:export #:operative #:dynenvp
+           #:local-operative #:data
            #:known-operative #:name
            #:applicative #:wrap #:unwrap
            #:constant #:value)

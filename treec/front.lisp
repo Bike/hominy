@@ -68,18 +68,40 @@
        (make-link symbol)))))
 
 (defun convert-cons (form env-var cenv)
-  (let* ((combinern (convert-form (car form) env-var cenv))
-         (combineri (info combinern)))
-    (etypecase combineri
+  (convert-combination (convert-form (car form) env-var cenv)
+                       (make-const (cdr form))
+                       env-var cenv))
+
+;;; Used as an argument to COMBINE opcode when we know the environment is not needed.
+;;; This facilitates the very important optimization of not referring to the local
+;;; environment in combinations that are known not to need it, which allows the local
+;;; environment to go unreified.
+(defvar *empty-env* (i:make-fixed-environment #() #()))
+
+(defun convert-combination (combinern combinandn env-var cenv)
+  (let ((combineri (info combinern)))
+    (typecase combineri
       (info:known-operative
-       (convert-known-operation (info:name combineri) combinern (cdr form) env-var cenv))
+       (cond ((and (typep combinandn 'const)
+                   (convert-known-operation (info:name combineri)
+                                            combinern (value combinandn) env-var cenv)))
+             ((not (info:dynenvp combineri))
+              ;; Don't need the environment - put in a sham.
+              ;; The main advantage of this is that FREE will find the env-var is not used.
+              (make-combination combinern combinandn (make-const *empty-env*)))
+             (t
+              (make-combination combinern combinandn (make-ref env-var)))))
+      (info:operative
+       (make-combination combinern combinandn
+                         (if (info:dynenvp combineri)
+                             (make-ref env-var)
+                             (make-const *empty-env*))))
       (info:applicative
-       ;; TODO: Probably need to recurse somehow for known applicatives.
-       (make-combination (make-unwrap combinern)
-                         (make-listn
-                          (loop for form in (cdr form)
-                                collect (convert-form form env-var cenv)))
-                         (make-ref env-var)))
-      (t (make-combination combinern
-                           (convert-constant (cdr form) env-var cenv)
-                           (make-ref env-var))))))
+       (if (typep combinandn 'const)
+           (convert-combination (make-unwrap combinern)
+                                (make-listn
+                                 (loop for form in (value combinandn)
+                                       collect (convert-form form env-var cenv)))
+                                env-var cenv)
+           (make-combination combinern combinandn (make-ref env-var))))
+      (t (make-combination combinern combinandn (make-ref env-var))))))

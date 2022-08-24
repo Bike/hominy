@@ -31,8 +31,9 @@
     :bindings (flet ((sym (name)
                        (intern name "BURKE/INTERPRETER/SYMS"))
                      (bi (info) (make-instance 'binding :info info))
-                     (ko (sym)
-                       (make-instance 'info:known-operative :name sym)))
+                     (ko (sym &optional (dynenvp t))
+                       (make-instance 'info:known-operative
+                         :name sym :dynenvp dynenvp)))
                 (append
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
@@ -41,7 +42,7 @@
                            "$LET" "$LETREC"))
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
-                             (cons sym (bi (info:wrap (ko sym))))))
+                             (cons sym (bi (info:wrap (ko sym nil))))))
                          '("EVAL" "COMBINE" "LOOKUP"
                            "ENVIRONMENT?" "MAKE-ENVIRONMENT"
                            "MAKE-FIXED-ENVIRONMENT"

@@ -3,8 +3,9 @@
 (defgeneric convert-known-operation (name combiner-node combinand env-var cenv))
 
 (defmethod convert-known-operation (name combinern combinand env-var cenv)
-  ;; In general, give up.
-  (make-combination combinern (convert-constant combinand env-var cenv) (make-ref env-var)))
+  ;; In general, give up- let convert-combination do its default.
+  (declare (ignore name combinern combinand env-var cenv))
+  nil)
 
 (defmethod convert-known-operation ((name (eql 'syms::$if))
                                     combinern combinand envv cenv)
