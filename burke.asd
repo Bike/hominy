@@ -7,7 +7,8 @@
                  (:file "interpret" :depends-on ("packages"))
                  (:file "plist" :depends-on ("packages"))
                  (:file "marshal" :depends-on ("interpret" "packages"))
-                 (:file "ground" :depends-on ("interpret" "plist" "packages"))))
+                 (:file "ground" :depends-on ("interpret" "plist" "packages"))
+                 (:file "core" :depends-on ("ground" "interpret" "packages"))))
    (:file "packages" :depends-on ("interpreter"))
    (:file "repl" :depends-on ("interpreter" "packages"))
    (:module "vm"

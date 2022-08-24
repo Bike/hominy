@@ -57,6 +57,15 @@ Signals an error if the symbol is not bound in the environment."
     (aux environment)
     (error "Unbound variable ~a" symbol)))
 
+(defun binds? (symbol environment)
+  "Returns (Lisp) true iff symbol is bound in environment, directly or indirectly."
+  (labels ((aux (environment)
+             (if (nth-value 1 (local-lookup symbol environment))
+                 (return-from binds? t)
+                 (map-parents #'aux environment))))
+    (aux environment)
+    nil))
+
 ;;; An environment that allows mutability, suitable for global environments.
 ;;; This can be used like standard Kernel's environments.
 ;;; Implemented as a hash table of cell objects.

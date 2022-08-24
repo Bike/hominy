@@ -141,5 +141,3 @@
   env)
 
 (defun make-ground-environment () (initialize-ground (make-environment)))
-
-(defun make-standard-environment () (make-environment (make-ground-environment)))
