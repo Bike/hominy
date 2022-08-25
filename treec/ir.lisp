@@ -17,8 +17,9 @@
    ;; A symbol uses internally to refer to the local environment.
    (%env-var :initarg :env-var :reader env-var :type symbol)))
 (defmethod info ((node operative))
-  ;; TODO
-  (info:default-info))
+  (make-instance 'info:local-operative
+    :data node
+    :dynenvp (closes-env-p node)))
 
 ;;; Indicator that an operative needs a reified environment.
 ;;; This essentially exists so that FREE can get at the appropriate env-var.

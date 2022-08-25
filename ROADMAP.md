@@ -92,7 +92,7 @@ Anyway, quick TODO list, in no order:
 - treec
 -- X core operation
 -- X basic operatives
--- vau forms (i.e. literal $vau in head)
+-- X vau forms (i.e. literal $vau in head)
 --- with wrapping
 -- $letrec
 -- direct calls

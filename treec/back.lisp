@@ -162,7 +162,7 @@
   (when (valuep context)
     (let* ((cf (cfunction context))
            (opcf (translate-operative node (link-env context) (asm:cmodule cf)))
-           (free (operative-free node))
+           (free (free node))
            ;; If we're inside an ENCLOSE node, that pushed the static env and left
            ;; the rest to us. (KLUDGE)
            (nclosed (if (closes-env-p node) (1+ (length free)) (length free))))
@@ -201,7 +201,7 @@
                     ;; TODO: When we reintroduce mutation, if the OEB is never actually
                     ;; mutated, we could just use it as an alias - like push a binding to
                     ;; an index that's exactly the same as the outer index.
-                    (asm:assemble 'o:ref outer-env-index 'o:set (nregs context))
+                    (asm:assemble cf 'o:ref outer-env-index 'o:set (nregs context))
                     (push (cons oeb (nregs context)) bindings)
                     (setf context (context context :new-regs 1 :new-stack 1)))
                   (when inner-envv ; haveta reify

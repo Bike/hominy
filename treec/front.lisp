@@ -72,6 +72,20 @@
                        (make-const (cdr form))
                        env-var cenv))
 
+(defun inline-local-combination (combinern combinandn env-var)
+  (let* ((body (body combinern))
+         (bfree (free body))
+         (eparam (eparam combinern))
+         ;; If the eparam exists and is free in the body, we gotta bind it.
+         (outer-env-bind-p (and (symbolp eparam) (member eparam bfree))))
+    (make-instance 'letn
+      :ptrees (list (ptree combinern)) :value-nodes (list combinandn)
+      :outer-env-bind (if outer-env-bind-p eparam nil)
+      :inner-env-var (if (closes-env-p combinern) (env-var combinern) nil)
+      ;; If we need to bind the dynenv, it's free.
+      :free (if outer-env-bind-p (list* env-var (free combinern)) (free combinern))
+      :env-var env-var :body body)))
+
 ;;; Used as an argument to COMBINE opcode when we know the environment is not needed.
 ;;; This facilitates the very important optimization of not referring to the local
 ;;; environment in combinations that are known not to need it, which allows the local
@@ -88,6 +102,27 @@
              ((not (info:dynenvp combineri))
               ;; Don't need the environment - put in a sham.
               ;; The main advantage of this is that FREE will find the env-var is not used.
+              (make-combination combinern combinandn (make-const *empty-env*)))
+             (t
+              (make-combination combinern combinandn (make-ref env-var)))))
+      (info:local-operative
+       (cond ((typep combinern 'operative)
+              ;; The combiner is a locally defined one, and what's more, this is the direct
+              ;; and only use of it. So we can just inline it as a let node.
+              ;; This is not the most general or efficient way to accomplish this, obviously.
+              ;; For example, we could recompile the operative's body with respect to any
+              ;; information gained from the known combinand, or we could handle more general
+              ;; cases (but see below).
+              (inline-local-combination combinern combinandn env-var))
+             ((and (typep combinern 'seq)
+                   (typep (final combinern) 'operative))
+              ;; This handles the common case of e.g. ($vau ...) becoming ($seq $vau ...).
+              (make-seq (for-effect combinern)
+                        (inline-local-combination (final combinern) combinandn env-var)))
+             ;; Past this point we don't inline, because the operative could be used in
+             ;; multiple positions, so inlining would involve code expansion. We should use
+             ;; a more efficient call though (FIXME). 
+             ((not (info:dynenvp combineri))
               (make-combination combinern combinandn (make-const *empty-env*)))
              (t
               (make-combination combinern combinandn (make-ref env-var)))))
