@@ -25,6 +25,12 @@
 (defgeneric unwrap (info))
 (defmethod unwrap ((info info)) (default-info))
 
+;;; Does a combiner use its dynamic environment? Note that all applicatives do,
+;;; as at least conceptually, they evaluate their arguments in that dynamic environment.
+;;; This can be imprecise, i.e. return T when the answer is actually but indiscernably false.
+(defgeneric dynenvp (info))
+(defmethod dynenvp ((info info)) t)
+
 (defclass operative (info)
   (;; Does the operative use its dynamic environment?
    (%dynenvp :initform t :initarg :dynenvp :reader dynenvp :type boolean)))
