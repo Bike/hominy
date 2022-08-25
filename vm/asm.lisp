@@ -14,7 +14,7 @@
 ;;; A function (operative) being compiled.
 (defclass cfunction ()
   ((%cmodule :initarg :cmodule :initform (error "missing arg") :reader cmodule :type cmodule)
-   (%plist :initarg :plist :initform (error "missing arg") :reader plist)
+   (%ptree :initarg :ptree :initform (error "missing arg") :reader ptree)
    (%eparam :initarg :eparam :initform (error "missing arg") :reader eparam)
    (%bytecode :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader bytecode)
    (%sep :accessor sep :type (and unsigned-byte fixnum)) ; xep is 0
@@ -31,7 +31,7 @@
   (push inst (cfunctions cmodule))
   ;; Put in a default name if none was provided.
   (unless namep
-    (setf (name inst) `(burke/interpreter/syms::$vau ,(plist inst) ,(eparam inst)))))
+    (setf (name inst) `(burke/interpreter/syms::$vau ,(ptree inst) ,(eparam inst)))))
 
 (defun closure-index (cfunction thing)
   (or (position thing (closed cfunction))

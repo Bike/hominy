@@ -1,15 +1,15 @@
 (in-package #:burke/treec)
 
-;;;; Code for generating plist bindings. It's lengthy, so it's here.
+;;;; Code for generating ptree bindings. It's lengthy, so it's here.
 
 ;;; Return a list of bindings (var . index)*, the index of the next free local,
 ;;; and the amount of stack space used.
-(defun gen-operative-bindings (cfunction plist eparam env-var)
-  (let* ((lin (linearize-plist plist))
+(defun gen-operative-bindings (cfunction ptree eparam env-var)
+  (let* ((lin (linearize-ptree ptree))
          (eparam-index (if (typep eparam 'i:ignore) nil 1))
          (local-env-index (cond ((not env-var) nil) (eparam-index 2) (t 1))))
     (multiple-value-bind (pbinds nlocals pstack)
-        (gen-plist-op cfunction plist (1+ (or local-env-index eparam-index 0)))
+        (gen-ptree-op cfunction ptree (1+ (or local-env-index eparam-index 0)))
       (multiple-value-bind (dynenv-binds dynenv-stack)
           ;; don't need to generate any code here, since the dynenv is already in slot 1.
           (if eparam-index
@@ -38,57 +38,57 @@
 ;;; starting with NEXT-LOCAL.
 ;;; Returns three values: An alist of bindings (i.e. (symbol . index)*), the number of
 ;;; registers used (which is also the number bound), and the amount of stack space used.
-(defun gen-plist-op (cfunction plist next-local)
-  ;; FIXME: Could be smarter, e.g. with a plist of (x) we could reuse local 0 to be
-  ;; X. In general we should be able to use 0 for something for any cons plist.
-  (etypecase plist
+(defun gen-ptree-op (cfunction ptree next-local)
+  ;; FIXME: Could be smarter, e.g. with a ptree of (x) we could reuse local 0 to be
+  ;; X. In general we should be able to use 0 for something for any cons ptree.
+  (etypecase ptree
     (null
      (asm:assemble cfunction 'o:ref 0 'o:err-if-not-null)
      (values nil 1 1))
-    (symbol (values (list (cons plist 0)) 1 0))
+    (symbol (values (list (cons ptree 0)) 1 0))
     (i:ignore (values nil 0 0))
     (cons
      (asm:assemble cfunction 'o:ref 0)
-     (gen-plist cfunction plist next-local))))
+     (gen-ptree cfunction ptree next-local))))
 
 ;;; Like the above, but assumes the value being bound is on the stack. Also, the second
 ;;; value will be the index of the next free local.
 ;;; At the end, destructuring will be complete and the stack will have that value popped.
-(defun gen-plist (cfunction plist next-local)
-  (etypecase plist
+(defun gen-ptree (cfunction ptree next-local)
+  (etypecase ptree
     (null
      (asm:assemble cfunction 'o:err-if-not-null)
      (values nil next-local 1))
     (symbol (asm:assemble cfunction 'o:set next-local)
-     (values (list (cons plist next-local)) (1+ next-local) 1))
+     (values (list (cons ptree next-local)) (1+ next-local) 1))
     (i:ignore (asm:assemble cfunction 'o:drop) (values nil next-local 1))
     (cons
-     (labels ((aux (plist)
-                (etypecase plist
+     (labels ((aux (ptree)
+                (etypecase ptree
                   (null (asm:assemble cfunction 'o:err-if-not-null)
                    (values nil 0))
                   (symbol
                    (asm:assemble cfunction 'o:set next-local)
                    (values
-                    (prog1 (list (cons plist next-local)) (incf next-local)) 0))
+                    (prog1 (list (cons ptree next-local)) (incf next-local)) 0))
                   ((cons i:ignore i:ignore)
                    (asm:assemble cfunction 'o:err-if-not-cons)
                    (values nil 0))
                   ((cons i:ignore t)
                    (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
-                   (multiple-value-bind (locals nstack) (aux (cdr plist))
+                   (multiple-value-bind (locals nstack) (aux (cdr ptree))
                      (values locals (max 1 nstack))))
                   ((cons t i:ignore)
                    (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
-                   (multiple-value-bind (locals nstack) (aux (car plist))
+                   (multiple-value-bind (locals nstack) (aux (car ptree))
                      (values locals (max 1 nstack))))
                   (cons
                    (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-                   (multiple-value-bind (carlocals carnstack) (aux (car plist))
+                   (multiple-value-bind (carlocals carnstack) (aux (car ptree))
                      (asm:assemble cfunction 'o:cdr)
-                     (multiple-value-bind (cdrlocals cdrnstack) (aux (cdr plist))
+                     (multiple-value-bind (cdrlocals cdrnstack) (aux (cdr ptree))
                        (values (append carlocals cdrlocals)
                                ;; could be (max 1...) but that's redundant with 1+
                                (max (1+ carnstack) cdrnstack))))))))
-       (multiple-value-bind (binds nstack) (aux plist)
+       (multiple-value-bind (binds nstack) (aux ptree)
          (values binds next-local (1+ nstack)))))))

@@ -57,8 +57,8 @@
 (defun constant-index (value context)
   (asm:constant-index (asm:cmodule (cfunction context)) value))
 
-(defun compile (plist eparam body cenvironment environment)
-  (let* ((result (compile-operative plist eparam body cenvironment
+(defun compile (ptree eparam body cenvironment environment)
+  (let* ((result (compile-operative ptree eparam body cenvironment
                                     (make-instance 'asm:cmodule)))
          (cfunction (info:data (info result)))
          (code (asm:link cfunction)))
@@ -76,7 +76,7 @@
 (defun compile-combiner (combiner cenv)
   (etypecase combiner
     (i:derived-operative
-     (compile (i:plist combiner) (i:eparam combiner)
+     (compile (i:ptree combiner) (i:eparam combiner)
               (i:body combiner) cenv (i:env combiner)))
     (i:applicative
      (i:wrap (compile-combiner (i:unwrap combiner) cenv)))
@@ -93,15 +93,15 @@
                       (compile-combiner combiner cenv)))
                   'syms::compile)))))
 
-(defun linearize-plist (plist)
-  (etypecase plist
+(defun linearize-ptree (ptree)
+  (etypecase ptree
     ((or null i:ignore) nil)
-    (symbol (list plist))
-    (cons (append (linearize-plist (car plist)) (linearize-plist (cdr plist))))))
+    (symbol (list ptree))
+    (cons (append (linearize-ptree (car ptree)) (linearize-ptree (cdr ptree))))))
 
-(defun compile-operative (plist eparam body cenv module)
+(defun compile-operative (ptree eparam body cenv module)
   (let* ((cf (make-instance 'asm:cfunction
-               :cmodule module :plist plist :eparam eparam))
+               :cmodule module :ptree ptree :eparam eparam))
          ;; All quick-compiled functions close over their static environment,
          ;; because quickc is not smart enough to remove it.
          (_ (asm:closure-index cf cenv))
@@ -114,37 +114,37 @@
                                                 :info (info:default-info)))))
                    cenv)))
     (declare (ignore _))
-    (multiple-value-bind (bindings context nlocals nstack) (gen-plist cf plist)
+    (multiple-value-bind (bindings context nlocals nstack) (gen-ptree cf ptree)
       (setf (asm:sep cf) (asm:nbytes (cfunction context)))
       ;; Set up the current environment to be in index 2.
       ;; We assume the closed over environment is in closure 0.
       (assemble context 'o:closure 0)
       (let* ((estack
-               (cond ((and (typep plist '(or null i:ignore))
+               (cond ((and (typep ptree '(or null i:ignore))
                            (typep eparam 'i:ignore))
                       (assemble context 'o:set 2)
                       1)
-                     ((and (typep plist '(and symbol (not null))) (symbolp eparam))
+                     ((and (typep ptree '(and symbol (not null))) (symbolp eparam))
                       (assemble context 'o:ref 0 'o:ref 1
-                        'o:make-environment (constant-index (list plist eparam) context))
+                        'o:make-environment (constant-index (list ptree eparam) context))
                       3)
-                     ((and (typep plist '(and symbol (not null))) (typep eparam 'i:ignore))
+                     ((and (typep ptree '(and symbol (not null))) (typep eparam 'i:ignore))
                       (assemble context 'o:ref 0
-                        'o:make-environment (constant-index (list plist) context))
+                        'o:make-environment (constant-index (list ptree) context))
                       2)
                      ((symbolp eparam)
                       (assemble context 'o:ref 1)
-                      (let* ((lin (linearize-plist plist))
+                      (let* ((lin (linearize-ptree ptree))
                              (llin (length lin)))
                         (loop repeat llin
                               for i from 3
                               do (assemble context 'o:ref i))
                         (assemble context 'o:make-environment
-                          (constant-index (list* eparam (linearize-plist lin)) context)
+                          (constant-index (list* eparam (linearize-ptree lin)) context)
                           'o:set 2)
                         (+ 2 llin)))
                      (t
-                      (let* ((lin (linearize-plist plist))
+                      (let* ((lin (linearize-ptree ptree))
                              (llin (length lin)))
                         (loop repeat llin
                               for i from 3
@@ -163,36 +163,36 @@
 ;;; Generate code to do argument parsing.
 ;;; Return four values:
 ;;; A list of bindings. A context. And the amounts of registers and stack used.
-(defun gen-plist (cfunction plist)
+(defun gen-ptree (cfunction ptree)
   (let* ((context
           (make-instance 'context
             :cfunction cfunction :env-index 2 :nlocals 3)))
-    (etypecase plist
+    (etypecase ptree
       (null
        (assemble context 'o:ref 0 'o:err-if-not-null)
        (values nil context 0 1))
       (symbol
        ;; Just use index 0 and don't bind anything.
-       (values (list (cons plist (make-instance 'local-binding
+       (values (list (cons ptree (make-instance 'local-binding
                                    :cfunction cfunction
                                    :index 0
                                    :info (info:default-info))))
                context 0 0))
       (i:ignore (values nil context 0 0))
       (cons ; this is the hard part.
-       (let* ((vars (linearize-plist plist))
+       (let* ((vars (linearize-ptree ptree))
               (nvars (length vars))
               (context (context context :new-locals nvars))
               (next-var-local 3))
          (labels ((next-var-local () (prog1 next-var-local (incf next-var-local)))
-                  (aux (plist next-temp-local)
-                    (etypecase plist
+                  (aux (ptree next-temp-local)
+                    (etypecase ptree
                       (i:ignore (values nil 0))
                       (null (assemble context 'o:err-if-not-null) (values nil 0))
                       (symbol
                        (let ((l (next-var-local)))
                          (assemble context 'o:set l)
-                         (values (list (cons plist (make-instance 'local-binding
+                         (values (list (cons ptree (make-instance 'local-binding
                                                      :cfunction cfunction
                                                      :index l
                                                      :info (info:default-info))))
@@ -203,17 +203,17 @@
                            'o:ref cons-local 'o:err-if-not-cons
                            'o:ref cons-local 'o:car)
                          (multiple-value-bind (car-locals car-temps)
-                             (aux (car plist) (1+ next-temp-local))
+                             (aux (car ptree) (1+ next-temp-local))
                            (assemble context 'o:ref cons-local 'o:cdr)
                            (multiple-value-bind (cdr-locals cdr-temps)
                                ;; We can just stomp on any temporaries the
-                               ;; car plist made, and on the cons now that we
+                               ;; car ptree made, and on the cons now that we
                                ;; don't need to do anything else with it.
-                               (aux (cdr plist) next-temp-local)
+                               (aux (cdr ptree) next-temp-local)
                              (values (append car-locals cdr-locals)
                                      (max (1+ car-temps) cdr-temps)))))))))
            (assemble context 'o:ref 0)
-           (multiple-value-bind (bindings ntemps) (aux plist (+ 3 nvars))
+           (multiple-value-bind (bindings ntemps) (aux ptree (+ 3 nvars))
              (values bindings context (+ 3 ntemps) 1))))))))
 
 (defun compile-seq (body cenv context)

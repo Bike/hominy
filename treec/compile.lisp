@@ -1,7 +1,7 @@
 (in-package #:burke/treec)
 
-(defun %compile (plist eparam body cenvironment environment)
-  (let* ((op (convert-operative plist eparam body cenvironment))
+(defun %compile (ptree eparam body cenvironment environment)
+  (let* ((op (convert-operative ptree eparam body cenvironment))
          (cmod (make-instance 'asm:cmodule))
          (cf (translate-operative op environment cmod))
          (code (asm:link cf))
@@ -19,7 +19,7 @@
 (defun compile (combiner cenv)
   (etypecase combiner
     (i:derived-operative
-     (%compile (i:plist combiner) (i:eparam combiner)
+     (%compile (i:ptree combiner) (i:eparam combiner)
                (i:body combiner) cenv (i:env combiner)))
     (i:applicative
      (i:wrap (compile (i:unwrap combiner) cenv)))

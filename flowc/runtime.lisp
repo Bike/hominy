@@ -13,10 +13,10 @@
            (enclosed combiner) (cons combinand env)))
 
 (defun caugment1 (env) (i:make-uninitialized-fixed-environment (list env)))
-(defun caugment2 (env plist object)
-  (let* ((names (coerce (plist-names plist) 'vector))
+(defun caugment2 (env ptree object)
+  (let* ((names (coerce (ptree-names ptree) 'vector))
          (values (make-array (length names))))
-    (i:bind-plist-to-vector plist object values 0)
+    (i:bind-ptree-to-vector ptree object values 0)
     (i:initialize-fixed-environment env names values)))
 
 (defun enclose (fun enclosed)

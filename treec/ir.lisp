@@ -6,7 +6,7 @@
 (defgeneric info (node))
 
 (defclass operative (node)
-  ((%plist :initarg :plist :reader plist)
+  ((%ptree :initarg :ptree :reader ptree)
    (%eparam :initarg :eparam :reader eparam)
    (%body :initarg :body :reader body :type node)
    ;; A list of free symbols.
@@ -94,7 +94,7 @@
 
 ;;; Used to convert $let-type bindings as well as inline operatives.
 (defclass letn (node)
-  ((%plists :initarg :plists :reader plists :type list)
+  ((%ptrees :initarg :ptrees :reader ptrees :type list)
    (%value-nodes :initarg :value-nodes :reader value-nodes :type list)
    ;; The variable bound to the environment the $let is evaluated in.
    (%env-var :initarg :env-var :reader env-var :type symbol)

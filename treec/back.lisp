@@ -45,32 +45,32 @@
 ;;; Make and return a cfunction for the given operative node.
 (defun translate-operative (operative link-env cmodule)
   (let* ((cf (make-instance 'asm:cfunction
-               :plist (plist operative) :eparam (eparam operative)
+               :ptree (ptree operative) :eparam (eparam operative)
                :cmodule cmodule))
          (closes-env-p (closes-env-p operative)))
-    (multiple-value-bind (locals plist-nregs plist-nstack)
-        (gen-operative-bindings cf (plist operative) (eparam operative)
+    (multiple-value-bind (locals ptree-nregs ptree-nstack)
+        (gen-operative-bindings cf (ptree operative) (eparam operative)
                                 (if closes-env-p (env-var operative) nil))
       (setf (asm:sep cf) (asm:nbytes cf))
       (when closes-env-p
         ;; if the environment is reified, close over the static environment.
-        ;; Note that plist.lisp needs this to be at closure 0.
+        ;; Note that ptree.lisp needs this to be at closure 0.
         (asm:closure-index cf *static-env-link-marker*))
-      (let ((*regs-hwm* plist-nregs) (*stack-hwm* plist-nstack))
+      (let ((*regs-hwm* ptree-nregs) (*stack-hwm* ptree-nstack))
         (translate (body operative)
                    (make-instance 'context
                      :cfunction cf :link-env link-env :locals locals
-                     :nregs plist-nregs :nstack 0))
+                     :nregs ptree-nregs :nstack 0))
         ;; We need at least two registers for the XEP to work.
         ;; FIXME: If we don't need a XEP we don't need those registers.
         (setf (asm:nlocals cf) (max 2 *regs-hwm*) (asm:nstack cf) *stack-hwm*)))
     cf))
 
-(defun linearize-plist (plist)
-  (etypecase plist
+(defun linearize-ptree (ptree)
+  (etypecase ptree
     ((or null i:ignore) nil)
-    (symbol (list plist))
-    (cons (append (linearize-plist (car plist)) (linearize-plist (cdr plist))))))
+    (symbol (list ptree))
+    (cons (append (linearize-ptree (car ptree)) (linearize-ptree (cdr ptree))))))
 
 ;;; This is separated out from the TRANSLATE on REF because it's also used by the
 ;;; translation for operative nodes, and when mutation is reintroduced, that will
@@ -181,11 +181,11 @@
 (defmethod translate ((node letn) orig-context)
   (loop with context = (context orig-context :valuep t :tailp nil)
         with cf = (cfunction context)
-        for plist in (plists node)
+        for ptree in (ptrees node)
         for valuen in (value-nodes node)
         do (translate valuen context)
         append (multiple-value-bind (bindings next-local nstack)
-                   (gen-plist (cfunction context) plist (nregs context))
+                   (gen-ptree (cfunction context) ptree (nregs context))
                  (setf context (context context :new-regs (- next-local (nregs context)) ; goofy
                                                 :new-stack nstack :valuep t :tailp nil))
                  bindings)

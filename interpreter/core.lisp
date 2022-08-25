@@ -100,8 +100,8 @@
                                 ($vau (ground ':$vau)))
                             (lambda (de combinand)
                               (declare (cl:ignore de))
-                              (destructuring-bind (plist . body) combinand
-                                (list wrap (list* $vau plist ignore body))))))
+                              (destructuring-bind (ptree . body) combinand
+                                (list wrap (list* $vau ptree ignore body))))))
         (defapp #:caar (ign #'caar))
         (defapp #:cadr (ign #'cadr))
         (defapp #:cdar (ign #'cdar))

@@ -21,7 +21,7 @@
 (defclass car (node) ()) ; inputs: cons
 (defclass cdr (node) ()) ; inputs: cons
 (defclass enclose (node) ()) ; inputs: function, enclosed
-(defclass augment (node) ()) ; inputs: env, plist, combinand
+(defclass augment (node) ()) ; inputs: env, ptree, combinand
 
 ;;; NOTE: All terminators have their destination as first operand.
 ;;; Also note that the dynenv of a combination is incorporated into the

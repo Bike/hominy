@@ -16,9 +16,9 @@
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment)
   (:export #:make-ground-environment #:make-standard-environment)
-  (:export #:bind-plist-to-vector)
+  (:export #:bind-ptree-to-vector)
   ;; Derived operative internals, for use with compilers
   ;; TODO: rename env to static-env, probably
-  (:export #:derived-operative #:plist #:eparam #:env #:body)
+  (:export #:derived-operative #:ptree #:eparam #:env #:body)
   ;; Serialization
   (:export #:marshal #:marshal-to-file #:unmarshal #:unmarshal-from-file))

@@ -46,7 +46,7 @@ If a compilation environment's assumptions no longer hold, the effects are undef
 
 The basic interface to the compiler is the `compile` applicative. `compile` accepts two arguments, a combiner and a compilation environment, and returns a compiled combiner. This compiler may be `eq?` to the input combiner, but `compile` is not required to perform any side effects to t he input combiner or otherwise. If the input combiner is already the result of a compilation, the effect is as if the original combiner was compiled in the meet of all the compilation environments it and its subsequent compilations have been compiled in.
 
-`compiled-operative` is defined as though it builds an operative normally (with `$vau`) and then compiles it in the given compilation environment, i.e. `(compiled-operative cenv static-env plist eparam body)` = `(compile (eval (list* $vau plist eparam body) static-env) cenv)`. It is provided for convenience, and for efficiency as the implementation may in this circumstance run the compiler directly without producing an intermediate and immediately discarded interpreted operative.
+`compiled-operative` is defined as though it builds an operative normally (with `$vau`) and then compiles it in the given compilation environment, i.e. `(compiled-operative cenv static-env ptree eparam body)` = `(compile (eval (list* $vau ptree eparam body) static-env) cenv)`. It is provided for convenience, and for efficiency as the implementation may in this circumstance run the compiler directly without producing an intermediate and immediately discarded interpreted operative.
 
 ## Evaluation Environments
 

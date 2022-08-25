@@ -1,12 +1,12 @@
 (in-package #:burke/interpreter)
 
 (defun bindings->namesvec (bindings)
-  (coerce (loop for (plist) in bindings nconc (plist-names plist)) 'vector))
+  (coerce (loop for (ptree) in bindings nconc (ptree-names ptree)) 'vector))
 
 (defun fill-values (bindings vec env)
   (loop with start = 0
-        for (plist form) in bindings
-        do (setf start (bind-plist-to-vector plist (eval form env) vec start))))
+        for (ptree form) in bindings
+        do (setf start (bind-ptree-to-vector ptree (eval form env) vec start))))
 
 (defun $let (env bindings &rest body)
   (let* ((names (bindings->namesvec bindings))
@@ -35,11 +35,11 @@
 
 ;;; Returns a function that, given a combinand passed
 ;;; to an operative, returns a new augmentation of static-env with everything
-;;; in the plist and eparam bound. It sort of pre "compiles" a plist.
-(defun make-augmenter (static-env plist eparam)
+;;; in the ptree and eparam bound. It sort of pre "compiles" a ptree.
+(defun make-augmenter (static-env ptree eparam)
   (etypecase eparam
     (ignore
-     (multiple-value-bind (names augmenter) (plist-augmenter plist 0)
+     (multiple-value-bind (names augmenter) (ptree-augmenter ptree 0)
        (declare (type (function (t simple-vector)) augmenter))
        (let* ((names-vec (coerce names 'vector))
               (nnames (length names-vec)))
@@ -49,7 +49,7 @@
              (funcall augmenter combinand vvec)
              (%augment static-env names-vec vvec))))))
     (symbol
-     (multiple-value-bind (names augmenter) (plist-augmenter plist 1)
+     (multiple-value-bind (names augmenter) (ptree-augmenter ptree 1)
        (declare (type (function (t simple-vector)) augmenter))
        (let* ((names-vec (coerce (list* eparam names) 'vector))
               (nnames (length names-vec)))
@@ -59,20 +59,20 @@
              (funcall augmenter combinand vvec)
              (%augment static-env names-vec vvec))))))))
 
-(defun make-derived-operative (static-env plist eparam body)
-  (let ((aug (make-augmenter static-env plist eparam)))
+(defun make-derived-operative (static-env ptree eparam body)
+  (let ((aug (make-augmenter static-env ptree eparam)))
     (make-instance 'derived-operative
-      :plist plist :eparam eparam :env static-env :augmenter aug
+      :ptree ptree :eparam eparam :env static-env :augmenter aug
       ;; Used to do (cons '$sequence body) here, but then $sequence becoming
       ;; rebound would be an issue, so instead the COMBINE method has been
       ;; modified to do a sequence of forms directly.
       :body body)))
 
-(defun $vau (static-env plist eparam &rest body)
-  (make-derived-operative static-env plist eparam body))
+(defun $vau (static-env ptree eparam &rest body)
+  (make-derived-operative static-env ptree eparam body))
 
 (defun $define! (env name form)
-  (bind-plist name (eval form env)
+  (bind-ptree name (eval form env)
               (lambda (symbol val state)
                 (declare (cl:ignore state))
                 (define val symbol env))

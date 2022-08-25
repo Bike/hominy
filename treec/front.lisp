@@ -5,23 +5,23 @@
 (defclass local-binding (cenv:binding) ())
 (defun make-local-binding () (make-instance 'local-binding))
 
-(defun plist->bindings (plist)
-  (labels ((aux (plist)
-             (etypecase plist
+(defun ptree->bindings (ptree)
+  (labels ((aux (ptree)
+             (etypecase ptree
                ((or null i:ignore) nil)
-               (symbol (list (cons plist (make-local-binding))))
-               (cons (append (aux (car plist)) (aux (cdr plist)))))))
-    (aux plist)))
+               (symbol (list (cons ptree (make-local-binding))))
+               (cons (append (aux (car ptree)) (aux (cdr ptree)))))))
+    (aux ptree)))
 
 ;;; Return a binding alist for make-cenv.
-(defun operative-bindings (plist eparam)
-  (let ((binds (plist->bindings plist)))
+(defun operative-bindings (ptree eparam)
+  (let ((binds (ptree->bindings ptree)))
     (etypecase eparam
       (symbol (list* (cons eparam (make-local-binding)) binds))
       (i:ignore binds))))
 
-(defun convert-operative (plist eparam body cenv)
-  (let* ((bindings (operative-bindings plist eparam))
+(defun convert-operative (ptree eparam body cenv)
+  (let* ((bindings (operative-bindings ptree eparam))
          (cenv (cenv:augment1 cenv bindings))
          (env-var (make-symbol "LOCAL-ENVIRONMENT"))
          (bodyn (convert-seq body env-var cenv))
@@ -31,7 +31,7 @@
             (values (delete env-var (nset-difference free (mapcar #'car bindings))) t)
             (values (nset-difference free (mapcar #'car bindings)) nil))
       (make-instance 'operative
-        :plist plist :eparam eparam
+        :ptree ptree :eparam eparam
         :free really-free :closes-env-p closes-env-p :env-var env-var
         :body (convert-seq body env-var cenv)))))
 

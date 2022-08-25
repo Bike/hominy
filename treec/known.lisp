@@ -21,8 +21,8 @@
   ;; the backend will compile it down to nothing.
   (make-seq
    (list combinern)
-   (destructuring-bind (plist eparam . body) combinand
-     (let ((op (convert-operative plist eparam body cenv)))
+   (destructuring-bind (ptree eparam . body) combinand
+     (let ((op (convert-operative ptree eparam body cenv)))
        ;; See note on defclass enclose for some explanation.
        (if (closes-env-p op)
            (make-enclose op envv)
@@ -51,13 +51,13 @@
             (convert-seq body envv cenv))
            (t
             (let* ((new-env-var (make-symbol "LET-ENVIRONMENT"))
-                   (plists (mapcar #'first bindings))
+                   (ptrees (mapcar #'first bindings))
                    (valns (mapcar (lambda (bind)
                                     (convert-form (second bind) envv cenv))
                                   bindings))
                    (new-bindings (reduce #'append bindings
                                          :key (lambda (binding)
-                                                (plist->bindings (first binding)))))
+                                                (ptree->bindings (first binding)))))
                    (cenv (cenv:augment1 cenv new-bindings))
                    (body (convert-seq body new-env-var cenv))
                    (free (free body))
@@ -69,5 +69,5 @@
                    ;; If it's not free, record that by storing the letn's env-var as nil.
                    (penv (if reifiedp new-env-var nil)))
               (make-instance 'letn
-                :plists plists :value-nodes valns :env-var envv :inner-env-var penv
+                :ptrees ptrees :value-nodes valns :env-var envv :inner-env-var penv
                 :free really-free :body body)))))))

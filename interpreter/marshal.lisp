@@ -6,14 +6,14 @@
 
 ;;; The augmenter is a function, so we can't dump it. Instead, recompute when loading.
 (defmethod cpk:encode-object append ((object derived-operative) &key &allow-other-keys)
-  (cpk:slots-to-alist (object) %plist %eparam %env %body))
+  (cpk:slots-to-alist (object) %ptree %eparam %env %body))
 (defmethod cpk:decode-object-initialize progn ((object derived-operative) class alist
                                                &key &allow-other-keys)
   (declare (cl:ignore class))
-  (cpk:alist-to-slots (alist object) %plist %eparam %env %body)
+  (cpk:alist-to-slots (alist object) %ptree %eparam %env %body)
   (setf (augmenter object)
         (make-augmenter (cdr (assoc '%env alist))
-                        (cdr (assoc '%plist alist)) (cdr (assoc '%eparam alist)))))
+                        (cdr (assoc '%ptree alist)) (cdr (assoc '%eparam alist)))))
 
 ;;; This is a sham put in so that conspack can check that builtins don't have circularity.
 ;;; Builtin operatives cannot actually be dumped.

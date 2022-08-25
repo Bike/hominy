@@ -176,7 +176,7 @@ Signals an error if the symbol is not bound in the environment."
 The function will receive two arguments, the dynamic environment and the combinand."
   (make-instance 'builtin-operative :fun function :name name))
 (defclass derived-operative (operative)
-  ((%plist :initarg :plist :reader plist) 
+  ((%ptree :initarg :ptree :reader ptree) 
    (%eparam :initarg :eparam :reader eparam :type (or ignore symbol))
    (%env :initarg :env :reader env)
    ;; A function that, given the dynamic environment and combinand, returns a
@@ -187,7 +187,7 @@ The function will receive two arguments, the dynamic environment and the combina
    ;; A list of forms (not just one form)
    (%body :initarg :body :reader body)))
 (defmethod name ((object derived-operative))
-  `(syms::$vau ,(plist object) ,(eparam object)))
+  `(syms::$vau ,(ptree object) ,(eparam object)))
 (defclass applicative (combiner)
   ((%underlying :initarg :underlying :reader unwrap :type combiner)))
 (defmethod name ((app applicative)) (name (unwrap app)))

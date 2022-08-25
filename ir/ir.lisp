@@ -26,7 +26,7 @@
 ;;;; Possible nodes are:
 ;;;; * (lookup symbol env)
 ;;;; * (enclose FUNCTION value)
-;;;; * (augment env plist object)
+;;;; * (augment env ptree object)
 ;;;; * (cons car cdr)
 ;;;; * (car cons)
 ;;;; * (cdr cons)
@@ -76,7 +76,7 @@
 ;;;; hopes of supporting tail recursion.
 
 ;;;; A function closes over a value. Initially this value is
-;;;; (lexenv plist eparam . body), as operatives may be constructed from
+;;;; (lexenv ptree eparam . body), as operatives may be constructed from
 ;;;; variable data rather than constants in the most general case,
 ;;;; e.g. from (combine $vau ...). This list is intended to be convenient to
 ;;;; produce from $vau by (cons dynenv combinand).

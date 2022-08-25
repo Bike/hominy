@@ -15,8 +15,8 @@
     (burke/ir:verify module)
     cf))
 
-(defun $cvau (static-env plist eparam &rest body)
-  (let* ((enclosed (list* static-env plist eparam body))
+(defun $cvau (static-env ptree eparam &rest body)
+  (let* ((enclosed (list* static-env ptree eparam body))
          (ir (%operative-ir enclosed))
          (module (burke/ir:module ir)))
     (when *dis* (format t "~&~a~%" (burke/ir:disassemble module)))
@@ -35,5 +35,5 @@
           (lambda (env combinand) (apply #'$cvau env combinand))))))
 
 ;;; debugging
-(defun operative-ir (static-env plist eparam &rest body)
-  (%operative-ir (list* static-env plist eparam body)))
+(defun operative-ir (static-env ptree eparam &rest body)
+  (%operative-ir (list* static-env ptree eparam body)))

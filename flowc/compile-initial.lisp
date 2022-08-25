@@ -128,7 +128,7 @@ Now lower stages can do things like figure out an efficient lookup and calling c
 
 ;;; This is the initial function all user functions are derived from. It just
 ;;; calls eval on its body, basically.
-;;; The enclosed data is (static-env plist eparam . body).
+;;; The enclosed data is (static-env ptree eparam . body).
 
 (defun fresh-function (&optional fname)
   (burke/ir:assemble ((f fname) enclosed return)
@@ -136,10 +136,10 @@ Now lower stages can do things like figure out an efficient lookup and calling c
      ()
      (:= static-env (burke/ir:car enclosed))
      (:= t0 (burke/ir:cdr enclosed))
-     (:= plist (burke/ir:car t0))
+     (:= ptree (burke/ir:car t0))
      (:= t1 (burke/ir:cdr t0))
      (:= eparam (burke/ir:car t1))
      (:= body (burke/ir:cdr t1))
-     (:= aplist (burke/ir:cons plist eparam))
-     (:= env (burke/ir:augment static-env aplist combinand.dynenv))
+     (:= aptree (burke/ir:cons ptree eparam))
+     (:= env (burke/ir:augment static-env aptree combinand.dynenv))
      (burke/ir:sequence return body env))))
