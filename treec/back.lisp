@@ -31,10 +31,11 @@
   ctxt)
 
 (defun context (context
-                &key (new-regs 0) (new-stack 0)
+                &key (new-regs 0) (new-stack 0) new-locals
                   (valuep (valuep context)) (tailp (tailp context)))
   (make-instance 'context
-    :cfunction (cfunction context) :link-env (link-env context) :locals (locals context)
+    :cfunction (cfunction context) :link-env (link-env context)
+    :locals (append new-locals (locals context))
     :nregs (+ (nregs context) new-regs) :nstack (+ (nstack context) new-stack)
     :valuep valuep :tailp (and valuep tailp)))
 
@@ -176,3 +177,46 @@
     ;; See KLUDGE in TRANSLATE OPERATIVE
     (symbol-binding (env-var node) context)
     (translate (operative node) context)))
+
+(defmethod translate ((node letn) orig-context)
+  (loop with context = (context orig-context :valuep t :tailp nil)
+        with cf = (cfunction context)
+        for plist in (plists node)
+        for valuen in (value-nodes node)
+        do (translate valuen context)
+        append (multiple-value-bind (bindings next-local nstack)
+                   (gen-plist (cfunction context) plist (nregs context))
+                 (setf context (context context :new-regs (- next-local (nregs context)) ; goofy
+                                                :new-stack nstack :valuep t :tailp nil))
+                 bindings)
+          into bindings
+        finally (let* ((outer-envv (env-var node))
+                       (oeb (outer-env-bind node))
+                       (inner-envv (inner-env-var node))
+                       (outer-env-index
+                         (when (or oeb inner-envv)
+                           (or (cdr (assoc outer-envv (locals context)))
+                               (error "?? Reified environment ~a missing" outer-envv)))))
+                  (when oeb
+                    ;; TODO: When we reintroduce mutation, if the OEB is never actually
+                    ;; mutated, we could just use it as an alias - like push a binding to
+                    ;; an index that's exactly the same as the outer index.
+                    (asm:assemble 'o:ref outer-env-index 'o:set (nregs context))
+                    (push (cons oeb (nregs context)) bindings)
+                    (setf context (context context :new-regs 1 :new-stack 1)))
+                  (when inner-envv ; haveta reify
+                    (asm:assemble 'o:ref outer-env-index)
+                    (loop for (_ . index) in bindings
+                          do (asm:assemble 'o:ref index))
+                    (asm:assemble 'o:make-environment
+                      (asm:constant-index cf (mapcar #'car bindings))
+                      'o:set (nregs context))
+                    (push (cons inner-envv (nregs context)) bindings)
+                    ;; This actually overestimates the stack by 1 if the oeb also exists. FIXME
+                    (setf context (context context :new-regs 1 :new-stack (1+ (length bindings))))))
+                (mark-regs (nregs context))
+                (mark-stack (nstack context))
+                (translate (body node)
+                           (context context :new-locals bindings
+                                            :valuep (valuep orig-context)
+                                            :tailp (tailp orig-context)))))

@@ -10,7 +10,7 @@
    (%eparam :initarg :eparam :reader eparam)
    (%body :initarg :body :reader body :type node)
    ;; A list of free symbols.
-   (%free :initarg :free :reader operative-free :type list)
+   (%free :initarg :free :reader free :type list)
    ;; True iff the operative uses its static environment arbitrarily
    ;; (i.e. if it needs to be reified by the encloser)
    (%closes-env-p :initarg :closes-env-p :reader closes-env-p :type boolean)
@@ -91,3 +91,19 @@
    (%else :initarg :else :reader else :type node)))
 (defun make-if (cond then else) (make-instance 'ifn :condition cond :then then :else else))
 (defmethod info ((node ifn)) (info:default-info)) ; TODO
+
+;;; Used to convert $let-type bindings as well as inline operatives.
+(defclass letn (node)
+  ((%plists :initarg :plists :reader plists :type list)
+   (%value-nodes :initarg :value-nodes :reader value-nodes :type list)
+   ;; The variable bound to the environment the $let is evaluated in.
+   (%env-var :initarg :env-var :reader env-var :type symbol)
+   ;; A variable the $let will bind to the outer environment
+   ;; (for conversion of inline operatives), or NIL if not bound.
+   (%outer-env-bind :initform nil :initarg :outer-env-bind :reader outer-env-bind :type symbol)
+   ;; A variable the body of the $let can use to refer to the environment established by the $let,
+   ;; or NIL if not needed.
+   (%inner-env-var :initarg :inner-env-var :reader inner-env-var :type symbol)
+   (%free :initarg :free :reader free :type list)
+   (%body :initarg :body :reader body :type node)))
+(defmethod info ((node letn)) (info (body node)))
