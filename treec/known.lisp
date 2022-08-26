@@ -1,5 +1,7 @@
 (in-package #:burke/treec)
 
+;;; Convert an operation where the combinand is known constant.
+;;; This is useful for basic operatives like $if, etc., that usually have constant combinands.
 (defgeneric convert-known-operation (name combiner-node combinand env-var cenv))
 
 (defmethod convert-known-operation (name combinern combinand env-var cenv)

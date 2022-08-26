@@ -94,6 +94,7 @@ Anyway, quick TODO list, in no order:
 -- X basic operatives
 -- X vau forms (i.e. literal $vau in head)
 --- with wrapping
+-- X inline applicatives with VM equivalents
 -- $letrec
 -- direct calls
 -- real tail calls

@@ -109,6 +109,44 @@
       (when (tailp context) (asm:assemble cfunction 'o:return)))))
 
 (defmethod translate ((node combination) context)
+  (or (translate-primitive node context)
+      (translate-general-combination node context)))
+
+;;; If the combiner is a primitive operative, and the combinand is a list of valid length,
+;;; compile down to VM operations instead of an actual combination.
+;;; If this is not possible, return NIL.
+;;; We do this in the backend, rather than having an IR node for primitives, because the kind of
+;;; optimizations the frontend does are insensitive to whether something is a VM primitive.
+;;; It would be an abstraction leak.
+(defun translate-primitive (node context)
+  (let ((combinern (combiner node)) (combinandn (combinand node)))
+    (if (typep combinandn 'listn)
+        (let* ((args (elements combinandn)) (nargs (length args))
+               (cf (cfunction context)))
+          (multiple-value-bind (arity op) (primitive combinern)
+            (cond ((and arity (= arity nargs))
+                   ;; we have a primitive and the argument count is correct, so we're doing this.
+                   ;; First, if we're not in a value context do nothing, as all primitives are
+                   ;; side-effect-free, at least for the moment.
+                   (when (valuep context)
+                     ;; We translate the combiner and env nodes in case they have side effects.
+                     ;; Translating the environment before the args is ok, since the order of
+                     ;; evaluation of an applicative's arguments is deliberately unspecified.
+                     (translate combinern (context context :valuep nil))
+                     (translate (env node) (context context :valuep nil))
+                     ;; Next we translate the arguments, one at a time.
+                     (loop for ns from 0
+                           for arg in args
+                           do (translate arg (context context :valuep t :tailp nil :new-stack ns)))
+                     ;; Do the actual operation.
+                     (asm:assemble cf op)
+                     ;; And finally, if we're in a tail context, return.
+                     (when (tailp context) (asm:assemble cf 'o:return)))
+                   t)
+                  (t nil))))
+        nil)))
+
+(defun translate-general-combination (node context)
   (translate (combiner node) (context context :valuep t :tailp nil))
   (translate (combinand node) (context context :valuep t :tailp nil :new-stack 1))
   (translate (env node) (context context :valuep t :tailp nil :new-stack 2))

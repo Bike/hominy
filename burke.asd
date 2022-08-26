@@ -34,7 +34,8 @@
                  (:file "free" :depends-on ("ir"))
                  (:file "known" :depends-on ("ir"))
                  (:file "front" :depends-on ("known" "ir" "free" "packages"))
-                 (:file "back" :depends-on ("ir" "packages"))
+                 (:file "primitives" :depends-on ("front" "packages"))
+                 (:file "back" :depends-on ("ir" "primitives" "packages"))
                  (:file "compile" :depends-on ("front" "back" "packages"))))
    (:module "ir"
     :depends-on ("info" "packages")
