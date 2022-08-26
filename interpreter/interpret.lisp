@@ -126,7 +126,7 @@ Signals an error if the symbol is not bound in the environment."
         (setf (aref (vvec env) pos) new)
         (error "New bindings cannot be added to a fixed environment ~a" env))))
 (defmethod map-bindings (function (env fixed-environment))
-  (map function (names env) (vvec env)))
+  (map nil function (names env) (vvec env)))
 
 (defun %augment (env names values)
   (make-instance 'fixed-environment

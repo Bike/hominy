@@ -1,5 +1,5 @@
 (defsystem :burke
-  :depends-on (:cl-conspack)
+  :depends-on (:cl-conspack :trivial-garbage)
   :components
   ((:module "interpreter"
     :depends-on ()
@@ -8,6 +8,7 @@
                  (:file "ptree" :depends-on ("packages"))
                  (:file "marshal" :depends-on ("interpret" "packages"))
                  (:file "ground" :depends-on ("interpret" "ptree" "packages"))
+                 (:file "static" :depends-on ("interpret" "packages"))
                  (:file "core" :depends-on ("ground" "interpret" "packages"))))
    (:file "packages" :depends-on ("interpreter"))
    (:file "repl" :depends-on ("interpreter" "packages"))

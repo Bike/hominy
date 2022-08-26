@@ -181,4 +181,4 @@
                                                       (aux (rest bindings))))))
                                    (aux bindings))))))
         (defapp #:for-each (simp #'k-for-each))))
-    (make-fixed-environment names values ground)))
+    (make-fixed-environment names values ground (static-keying-environment))))

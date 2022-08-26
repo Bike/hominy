@@ -47,7 +47,8 @@ Anyway, quick TODO list, in no order:
 --- marks?
 --- prompts?
 -- dynamic binding
--- static binding (i.e. the report's "gensyms")
+-- X static binding (i.e. the report's "gensyms")
+--- convenient macrology (e.g. once-only)
 -- X macros
 -- types
 -- type definition
