@@ -36,14 +36,36 @@
              (funcall augmenter combinand vvec)
              (make-fixed-environment names-vec vvec static-env))))))))
 
+;;; We actually account for circularity here for old time's sake.
+;;; And because it's consing anyway, so who cares about consing up a table too?
+;;; Besides exposing this function to Burke, we also use it to copy ptrees and $vau bodies
+;;; and stuff, like Kernel does. Prevents programmers from doing goofy bullshit.
+;;; In Kernel the copy's immutable, which would also be good for that (and does matter
+;;; because the programmer could in some situations get at the substructures) but we
+;;; don't have immutable conses. I guess we should, maybe?
+(defun copy-es (object)
+  (if (consp object)
+      (let ((table (make-hash-table :test #'eq)))
+        (labels ((copy (object)
+                   (cond ((atom object) object)
+                         ((gethash object table))
+                         (t
+                          (let ((copy (cons nil nil)))
+                            (setf (gethash object table) copy)
+                            (setf (car copy) (copy (car object))
+                                  (cdr copy) (copy (cdr object)))
+                            copy)))))
+          (copy object)))
+      object))
+
 (defun make-derived-operative (static-env ptree eparam body)
   (let ((aug (make-augmenter static-env ptree eparam)))
     (make-instance 'derived-operative
-      :ptree ptree :eparam eparam :env static-env :augmenter aug
+      :ptree (copy-es ptree) :eparam eparam :env static-env :augmenter aug
       ;; Used to do (cons '$sequence body) here, but then $sequence becoming
       ;; rebound would be an issue, so instead the COMBINE method has been
       ;; modified to do a sequence of forms directly.
-      :body body)))
+      :body (copy-es body))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -96,6 +118,9 @@
         (error 'type-error :datum cons :expected-type 'cons)))
   (defpred cons? consp)
   (defpred null? null)
+  (defapp copy-es (object) ignore (copy-es object))
+  (defapp set-car! (pair object) ignore (rplaca pair object) inert)
+  (defapp set-cdr! (pair object) ignore (rplacd pair object) inert)
   ;; symbols
   (defpred symbol? symbolp)
   ;; equivalence

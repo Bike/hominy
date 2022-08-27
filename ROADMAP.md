@@ -62,6 +62,7 @@ Anyway, quick TODO list, in no order:
  - types
  - type definition
   - generalize encapsulated types to hold multiple objects directly (more efficient i hope)
+ - immutable conses?
 - conforming kernel option
  - circularity
 - compilation semantics

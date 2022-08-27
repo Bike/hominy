@@ -84,7 +84,6 @@
          (op (make-builtin-operative body 'syms::$or?)))
     (setf (%expander $or?) op)
     (define $or? 'syms::$or? *defining-environment*))
-  ;; Need static keys to define $and? and $or? as macros - TODO
   (defapp combiner? (object) ignore (boolify (typep object 'combiner)))
   (defapp append (&rest lists) ignore (reduce #'append lists))
   (defapp filter (app list) ignore
