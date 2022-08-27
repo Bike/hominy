@@ -46,10 +46,14 @@ Anyway, quick TODO list, in no order:
 --- guards
 --- marks?
 --- prompts?
+-- conditions
+--- syntax/operatives
+--- hierarchy
 -- dynamic binding
 -- X static binding (i.e. the report's "gensyms")
 --- convenient macrology (e.g. once-only)
 -- X macros
+--- expose to Burke
 -- types
 -- type definition
 --- generalize encapsulated types to hold multiple objects directly (more efficient i hope)
