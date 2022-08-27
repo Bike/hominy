@@ -2,7 +2,7 @@
 
 (defun instruction-length (op)
   (ecase op
-    ((o:nop o:drop o:dup o:cons o:car o:cdr o:return
+    ((o:nop o:drop o:dup o:make-cell o:cell-ref o:cell-set o:cons o:car o:cdr o:return
             o:combine o:tail-combine o:lookup o:unwrap
             o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
      1)
@@ -20,7 +20,7 @@
                        (loop repeat n collect (aref bytecode (incf ip))))
                (incf ip))))
       (ecase (car pair)
-        ((o:nop o:drop o:dup o:cons o:car o:cdr o:return
+        ((o:nop o:drop o:dup o:make-cell o:cell-ref o:cell-set o:cons o:car o:cdr o:return
                 o:combine o:tail-combine o:lookup o:unwrap
                 o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
          (fixed 0))

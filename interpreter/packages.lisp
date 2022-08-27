@@ -14,6 +14,7 @@
   (:export #:macro #:make-macro)
   (:export #:ignore #:inert #:boolean #:true #:false)
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
+           #:make-fixed-environment-with-cells
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment
            #:make-immutable-environment #:copy-env-immutable)
   (:export #:make-cell #:cell-value)

@@ -20,6 +20,7 @@
                           collect `(defconstant ,sym ,i))))))
   (def nop drop dup
     ref set closure const
+    make-cell cell-ref cell-set
     cons list car cdr
     return jump jump-if-true
     combine tail-combine lookup unwrap enclose make-environment

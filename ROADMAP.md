@@ -100,7 +100,8 @@ Anyway, quick TODO list, in no order:
  - X vau forms (i.e. literal $vau in head)
   - with wrapping
  - X inline applicatives with VM equivalents
- - mutation
+ - X mutation
+  - inline $set!
  - $letrec
  - direct calls
  - real tail calls

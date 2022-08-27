@@ -183,6 +183,13 @@ If the symbol is not already bound, an error is signaled. This function never cr
     :names (map 'vector #'identity symbols)
     :vvec (map 'vector #'make-cell values)))
 
+;;; Used by the compiler(s).
+(defun make-fixed-environment-with-cells (symbols cells &rest parents)
+  (make-instance 'fixed-environment
+    :parents (copy-list parents)
+    :names (map 'vector #'identity symbols)
+    :vvec (map 'vector #'identity cells)))
+
 ;;; Two stage augment, used in the runtime.
 (defun %augment1 (env)
   (make-instance 'fixed-environment :parents (list env)))

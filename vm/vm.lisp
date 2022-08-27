@@ -86,6 +86,9 @@
         ((#.o:set) (setf (reg (next-code)) (spop)) (incf ip))
         ((#.o:closure) (spush (closure (next-code))) (incf ip))
         ((#.o:const) (spush (constant (next-code))) (incf ip))
+        ((#.o:make-cell) (spush (i:make-cell (spop))) (incf ip))
+        ((#.o:cell-ref) (spush (i:cell-value (spop))) (incf ip))
+        ((#.o:cell-set) (setf (i:cell-value (spop)) (spop)) (incf ip))
         ((#.o:cons) (let ((cdr (spop))) (spush (cons (spop) cdr))) (incf ip))
         ((#.o:list) (spush (gather (next-code))) (incf ip))
         ((#.o:car) (spush (car (the cons (spop)))) (incf ip))
@@ -116,7 +119,8 @@
          (incf ip))
         ((#.o:make-environment)
          (let ((names (constant (next-code))))
-           (spush (i:make-fixed-environment names (gather (length names)) (spop))))
+           (spush (i:make-fixed-environment-with-cells
+                   names (gather (length names)) (spop))))
          (incf ip))
         ;; call, tail-call
         ((#.o:err-if-not-cons)

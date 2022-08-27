@@ -16,6 +16,7 @@
 (defclass context ()
   ((%cfunction :initarg :cfunction :reader cfunction :type asm:cfunction)
    (%link-env :initarg :link-env :reader link-env :type i:environment)
+   ;; A list (var index cellp)*
    (%locals :initarg :locals :reader locals :type list)
    (%nregs :initarg :nregs :reader nregs :type (integer 0))
    (%nstack :initarg :nstack :reader nstack :type (integer 0))
@@ -73,13 +74,14 @@
     (cons (append (linearize-ptree (car ptree)) (linearize-ptree (cdr ptree))))))
 
 ;;; This is separated out from the TRANSLATE on REF because it's also used by the
-;;; translation for operative nodes, and when mutation is reintroduced, that will
-;;; have to do something slightly different.
+;;; translation for operative nodes.
 (defun symbol-binding (symbol context)
   (let ((lpair (assoc symbol (locals context)))
         (cf (cfunction context)))
-    (cond (lpair (asm:assemble cf 'o:ref (cdr lpair)))
-          (t (asm:assemble cf 'o:closure (asm:closure-index cf symbol))))))
+    (cond ((not lpair) (asm:assemble cf 'o:closure (asm:closure-index cf symbol)))
+          ((third lpair) ; cell
+           (asm:assemble cf 'o:ref (second lpair) 'o:cell-ref))
+          (t (asm:assemble cf 'o:ref (second lpair))))))
 
 (defmethod translate ((node ref) context)
   (when (valuep context)
@@ -223,7 +225,7 @@
         for valuen in (value-nodes node)
         do (translate valuen context)
         append (multiple-value-bind (bindings next-local nstack)
-                   (gen-ptree (cfunction context) ptree (nregs context))
+                   (gen-ptree (cfunction context) ptree (nregs context) (inner-env-var node))
                  (setf context (context context :new-regs (- next-local (nregs context)) ; goofy
                                                 :new-stack nstack :valuep t :tailp nil))
                  bindings)
@@ -231,25 +233,31 @@
         finally (let* ((outer-envv (env-var node))
                        (oeb (outer-env-bind node))
                        (inner-envv (inner-env-var node))
+                       (cellp inner-envv)
                        (outer-env-index
                          (when (or oeb inner-envv)
-                           (or (cdr (assoc outer-envv (locals context)))
+                           (or (second (assoc outer-envv (locals context)))
                                (error "?? Reified environment ~a missing" outer-envv)))))
                   (when oeb
-                    ;; TODO: When we reintroduce mutation, if the OEB is never actually
-                    ;; mutated, we could just use it as an alias - like push a binding to
-                    ;; an index that's exactly the same as the outer index.
-                    (asm:assemble cf 'o:ref outer-env-index 'o:set (nregs context))
-                    (push (cons oeb (nregs context)) bindings)
+                    ;; NOTE: Since treec is simple, we know the local environment, i.e.
+                    ;; what's in outer-env-index, is never cloistered (in a cell).
+                    ;; TODO: If the OEB is never actually mutated, we could just use it
+                    ;; as an alias - like push a binding to an index that's exactly the
+                    ;; same as the outer index.
+                    (asm:assemble cf 'o:ref outer-env-index)
+                    (when cellp (asm:assemble cf 'o:make-cell))
+                    (asm:assemble cf 'o:set (nregs context))
+                    (push (list oeb (nregs context) cellp) bindings)
                     (setf context (context context :new-regs 1 :new-stack 1)))
                   (when inner-envv ; haveta reify
-                    (asm:assemble 'o:ref outer-env-index)
-                    (loop for (_ . index) in bindings
-                          do (asm:assemble 'o:ref index))
-                    (asm:assemble 'o:make-environment
+                    (asm:assemble cf 'o:ref outer-env-index)
+                    (loop for (_1 index _2) in bindings
+                          do (asm:assemble cf 'o:ref index))
+                    (asm:assemble cf 'o:make-environment
                       (asm:constant-index cf (mapcar #'car bindings))
                       'o:set (nregs context))
-                    (push (cons inner-envv (nregs context)) bindings)
+                    ;; just to reiterate - local environments never need to be in cells.
+                    (push (list inner-envv (nregs context) nil) bindings)
                     ;; This actually overestimates the stack by 1 if the oeb also exists. FIXME
                     (setf context (context context :new-regs 1 :new-stack (1+ (length bindings))))))
                 (mark-regs (nregs context))
