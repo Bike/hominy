@@ -2,9 +2,17 @@ This is an implementation of a language resembling [https://web.cs.wpi.edu/~jshu
 
 # How to use
 
-Load the `burke` system. For now no coherent interface is presented, but you can try `(burke::repl)` to get a read-eval-print loop.
+Load the `burke` system. Call `(burke:repl)` to get a Burke REPL with the base library, which includes some of the operatives etc. in the Kernel report and some other stuff also, which is not fully documented. As of this writing, the parts of the Kernel report implemented are most of the "core library features", as well as a version of keyed static variables. Use `(exit)` to exit the REPL.
 
-This section will be expanded as the system comes together.
+`burke:read`, `burke:read-from-string`, `burke/interpreter:eval`, `burke/interpreter:lookup`, and `burke/interpreter:combine` can be employed together to execute Burke code from within the host Lisp REPL.
+
+## The compiler
+
+So far only the "tree" compiler is remotely operable. It can do some basic optimizations like avoiding consing environments in basic cases, reducing combinations of basic operatives like `$let` or `$if`, etc.
+
+To use it, try `(burke:repl :modules (list (burke/cenv:module) (burke/treec:module)))`. Then you will be able to use the `compile` applicative and the `standard-compilation-environment`. To compile a combiner, do `(compile combiner-goes-here standard-compilation-environment)` and you will get a compiled combiner back.
+
+For now the only real target for Burke is a VM.
 
 # What is this?
 
