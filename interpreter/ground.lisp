@@ -8,29 +8,6 @@
         for (ptree form) in bindings
         do (setf start (bind-ptree-to-vector ptree (eval form env) vec start))))
 
-(defun $let (env bindings &rest body)
-  (let* ((names (bindings->namesvec bindings))
-         (values (make-array (length names)))
-         (new-env (%augment env names values)))
-    (fill-values bindings values env)
-    (apply #'$sequence new-env body)))
-
-;;; Given our fixed environments, $letrec actually can't be derived.
-;;; It also has slightly different behavior from Kernel with respect to forms
-;;; that immediately evaluate the newly bound names. In Kernel, doing such will
-;;; get you the outside binding value if there is one, or else error with an
-;;; unbound variable. (This is not stated outright but is the behavior of the
-;;; given derivation.) This here binds everything to #inert. I think the ideal
-;;; would be to signal an error. To do that, either there needs to be a special
-;;; "unbound" marker to put in temporarily, or something like symbol macros.
-;;; I'm inclined towards the latter.
-(defun $letrec (env bindings &rest body)
-  (let* ((names (bindings->namesvec bindings))
-         (values (make-array (length names) :initial-element inert))
-         (new-env (%augment env names values)))
-    (fill-values bindings values new-env)
-    (apply #'$sequence new-env body)))
-
 (defun exit (&rest values) (throw 'abort values))
 
 ;;; Returns a function that, given a combinand passed
@@ -68,76 +45,79 @@
       ;; modified to do a sequence of forms directly.
       :body body)))
 
-(defun $vau (static-env ptree eparam &rest body)
-  (make-derived-operative static-env ptree eparam body))
-
-(defun $define! (env name form)
-  (bind-ptree name (eval form env)
-              (lambda (symbol val state)
-                (declare (cl:ignore state))
-                (define val symbol env))
-              nil)
-  inert)
-
-(defun $if (env condition then else)
-  (let ((c (eval condition env)))
-    (cond ((not (booleanp c))
-           (error "Invalid condition for ~s: ~s evaluated to ~s"
-                  '$if condition c))
-          ((value c) (eval then env))
-          (t (eval else env)))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun initialize-ground (env)
-  (labels ((simp (f) (lambda (dynamic-env combinand)
-                       (apply f dynamic-env combinand)))
-           (ign (f) (lambda (dynamic-env combinand)
-                      (declare (cl:ignore dynamic-env))
-                      (apply f combinand)))
-           (ignb (f) (lambda (dynamic-env combinand)
-                       (declare (cl:ignore dynamic-env))
-                       (boolify (apply f combinand))))
-           (op (f name) (make-instance 'builtin-operative :fun f :name name))
-           (app (f name) (make-instance 'applicative :underlying (op f name)))
-           (defop (name f) (define (op f name) name env))
-           (defapp (name f) (define (app f name) name env)))
-    ;; core semantics
-    (defapp 'syms::eval (ign #'eval))
-    (defapp 'syms::combine (ign #'combine))
-    (defapp 'syms::lookup (ign #'lookup))
-    ;; ignores
-    (defapp 'syms::ignore? (ignb #'ignorep))
-    ;; environments
-    (defapp 'syms::environment? (ign #'environmentp))
-    (defapp 'syms::make-environment (ign #'make-environment))
-    (defapp 'syms::make-fixed-environment (ign #'make-fixed-environment))
-    (defop  'syms::$define! (simp #'$define!))
-    ;; operatives
-    (defop  'syms::$vau (simp #'$vau))
-    (defapp 'syms::operative? (ignb #'operativep))
-    ;; applicatives
-    (defapp 'syms::applicative? (ignb #'applicativep))
-    (defapp 'syms::wrap (ign #'wrap))
-    (defapp 'syms::unwrap (ign #'unwrap))
-    ;; lists
-    (defapp 'syms::cons (ign #'cons))
-    (defapp 'syms::car (ign #'kar))
-    (defapp 'syms::cdr (ign #'kdr))
-    (defapp 'syms::cons? (ignb #'consp))
-    (defapp 'syms::null? (ignb #'null))
-    ;; symbols
-    (defapp 'syms::symbol? (ignb #'symbolp))
-    ;; equivalence
-    (defapp 'syms::eq? (ignb #'eql))
-    ;; booleans
-    (defop  'syms::$if (simp #'$if))
-    (defapp 'syms::boolean? (ignb #'booleanp))
-    ;; control
-    (defop  'syms::$sequence (simp #'$sequence))
-    (defop  'syms::$let (simp #'$let))
-    (defop  'syms::$letrec (simp #'$letrec))
-    (defapp 'syms::exit (ign #'exit)))
-  env)
-
-(defun make-ground-environment () (initialize-ground (make-environment)))
+(defenv *ground* ()
+  ;; core semantics
+  (defapp eval (form env) ignore (eval form env))
+  (defapp combine (combiner combinand env) ignore (combine combiner combinand env))
+  (defapp lookup (symbol env) ignore (lookup symbol env))
+  ;; ignores
+  (defapp ignore? (object) ignore (ignorep object))
+  ;; environments
+  (defapp environment? (object) ignore (environmentp object))
+  (defapp make-environment (&rest parents) ignore (apply #'make-environment parents))
+  (defapp make-fixed-environment (symbols values &rest parents) ignore
+    (apply #'make-fixed-environment symbols values parents))
+  (defop  $define! (name form) env
+    (bind-ptree name (eval form env)
+                (lambda (symbol val state)
+                  (declare (cl:ignore state))
+                  (define val symbol env))
+                nil)
+    inert)
+  ;; operatives
+  (defop  $vau (ptree eparam &rest body) static
+    (make-derived-operative static ptree eparam body))
+  (defapp operative? (object) ignore (operativep object))
+  ;; applicatives
+  (defapp applicative? (object) ignore (applicativep object))
+  (defapp wrap (combiner) ignore (wrap combiner))
+  (defapp unwrap (applicative) ignore (unwrap applicative))
+  ;; lists
+  (defapp cons (car cdr) ignore (cons car cdr))
+  (defapp car (cons) ignore
+    (if (typep cons 'cons)
+        (car (the cons cons))
+        (error 'type-error :datum cons :expected-type 'cons)))
+  (defapp cdr (cons) ignore
+    (if (typep cons 'cons)
+        (cdr (the cons cons))
+        (error 'type-error :datum cons :expected-type 'cons)))
+  (defapp cons? (object) ignore (consp object))
+  (defapp null? (object) ignore (null object))
+  ;; symbols
+  (defapp symbol? (object) ignore (symbolp object))
+  ;; equivalence
+  (defapp eq? (object1 object2) ignore (eql object1 object2))
+  ;; booleans
+  (defop  $if (condition then else) dynenv
+    (let ((c (eval condition dynenv)))
+      (cond ((eq c true) (eval then dynenv))
+            ((eq c false) (eval else dynenv))
+            (t (error 'type-error :datum c :expected-type 'boolean)))))
+  (defapp boolean? (object) ignore (booleanp object))
+  ;; control
+  (defop  $sequence (&rest forms) dynenv (apply #'$sequence dynenv forms))
+  (defop  $let (bindings &rest body) env
+    (let* ((names (bindings->namesvec bindings))
+           (values (make-array (length names)))
+           (new-env (%augment env names values)))
+      (fill-values bindings values env)
+      (apply #'$sequence new-env body)))
+  ;; Given our fixed environments, $letrec actually can't be derived.
+  ;; It also has slightly different behavior from Kernel with respect to forms
+  ;; that immediately evaluate the newly bound names. In Kernel, doing such will
+  ;; get you the outside binding value if there is one, or else error with an
+  ;; unbound variable. (This is not stated outright but is the behavior of the
+  ;; given derivation.) This here binds everything to #inert. I think the ideal
+  ;; would be to signal an error. To do that, either there needs to be a special
+  ;; "unbound" marker to put in temporarily, or something like symbol macros.
+  ;; I'm inclined towards the latter.
+  (defop  $letrec (bindings &rest body) env
+    (let* ((names (bindings->namesvec bindings))
+           (values (make-array (length names) :initial-element inert))
+           (new-env (%augment env names values)))
+      (fill-values bindings values new-env)
+      (apply #'$sequence new-env body)))
+  (defapp exit (&rest values) ignore (throw 'abort values)))

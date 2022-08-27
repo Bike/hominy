@@ -120,31 +120,16 @@
       (make-instance 'static-fixed-environment
         :parents parents :names namevec :vvec vvec))))
 
-;;; Return a Burke environment with static key primitives bound.
-;;; $make-static-key optionally takes a symbolic name, and returns (binder key).
-;;; make-static-fixed-environment and static-lookup are as above.
-;;; And we have the type predicates static-key? and static-binder?.
-(defun static-keying-environment ()
-  (let ((names nil) (values nil))
-    (labels ((def (name value) (push name names) (push value values))
-             (ign (f) (lambda (dynenv combinand)
-                        (declare (cl:ignore dynenv))
-                        (apply f combinand)))
-             (op (f name) (make-builtin-operative f name))
-             (app (f name) (wrap (op f name))))
-      (macrolet ((defop (sdesig f)
-                   (let ((name (intern (string sdesig) "BURKE/INTERPRETER/SYMS")))
-                     `(def ',name (op ,f ',name))))
-                 (defapp (sdesig f)
-                   (let ((name (intern (string sdesig) "BURKE/INTERPRETER/SYMS")))
-                     `(def ',name (app ,f ',name)))))
-        (defop  #:$make-static-key (ign (lambda (&optional name)
-                                          (multiple-value-list (make-static-key name)))))
-        (defapp #:make-static-fixed-environment (ign #'make-static-fixed-environment))
-        (defapp #:static-lookup (ign #'static-lookup))
-        (defapp #:static-key? (ign #'static-key-p))
-        (defapp #:static-binder? (ign #'static-binder-p))))
-    (make-fixed-environment names values)))
+(defenv *static* ()
+  (defop  $make-static-key (&optional name) ignore
+    (multiple-value-list (make-static-key name)))
+  (defapp make-static-fixed-environment (binders values &rest parents) ignore
+    (apply #'make-static-fixed-environment binders values parents))
+  (defapp static-lookup (key environment) ignore (static-lookup key environment))
+  ;; convenience applicative - like static-lookup but uses the dynenv.
+  (defapp static-variable (key) dynenv (static-lookup key dynenv))
+  (defapp static-key? (object) ignore (static-key-p object))
+  (defapp static-binder? (object) ignore (static-binder-p object)))
 
 #|
 ;;; Here is how make-keyed-static-variable would be implemented in terms of these.

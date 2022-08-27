@@ -15,7 +15,7 @@
   (:export #:ignore #:inert #:boolean #:true #:false)
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment)
-  (:export #:make-ground-environment #:make-standard-environment)
+  (:export #:*base*)
   (:export #:bind-ptree-to-vector)
   ;; Derived operative internals, for use with compilers
   ;; TODO: rename env to static-env, probably

@@ -74,6 +74,11 @@ Signals an error if the symbol is not bound in the environment."
    (%table :initform (make-hash-table :test #'eq)
            :reader regular-environment-table)))
 
+(defmethod print-object ((object regular-environment) stream)
+  (print-unreadable-object (object stream :type t)
+    (write (list (hash-table-count (regular-environment-table object))) :stream stream))
+  object)
+
 (defun cell (symbol regular-environment)
   (gethash symbol (regular-environment-table regular-environment)))
 (defun (setf cell) (new symbol regular-environment)
@@ -259,14 +264,3 @@ The function will receive two arguments, the dynamic environment and the combina
                  for value = (eval form env)
                  when (null rest)
                    return value))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun kar (cons)
-  (if (consp cons)
-      (car cons)
-      (error 'type-error :expected-type 'cons :datum cons)))
-(defun kdr (cons)
-  (if (consp cons)
-      (cdr cons)
-      (error 'type-error :expected-type 'cons :datum cons)))
