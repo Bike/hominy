@@ -1,7 +1,7 @@
 (in-package #:burke/interpreter)
 
 (defclass macro (operative)
-  ((%expander :initarg :expander :reader expander :type combiner)))
+  ((%expander :initarg :expander :reader expander :accessor %expander :type combiner)))
 (defun make-macro (expander) (make-instance 'macro :expander expander))
 (defmethod name ((op macro)) (name (expander op)))
 

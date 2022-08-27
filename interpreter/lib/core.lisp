@@ -61,6 +61,29 @@
              (unless (typep b 'boolean) (error 'type-error :datum b :expected-type 'boolean))
              (eq b true))
            bools)))
+  ;; KLUDGE for recursive definitions.
+  (let* (($and? (make-instance 'macro))
+         ($if (lookup 'syms::$if *ground*))
+         (body
+           (lambda (dynenv bools)
+             (declare (cl:ignore dynenv))
+             (cond ((null bools) true)
+                   ((null (cdr bools)) (first bools)) ; tail context
+                   (t (list $if (first bools) (list* $and? (rest bools)) false)))))
+         (op (make-builtin-operative body 'syms::$and?)))
+    (setf (%expander $and?) op)
+    (define $and? 'syms::$and? *defining-environment*))
+  (let* (($or? (make-instance 'macro))
+         ($if (lookup 'syms::$if *ground*))
+         (body
+           (lambda (dynenv bools)
+             (declare (cl:ignore dynenv))
+             (cond ((null bools) false)
+                   ((null (cdr bools)) (first bools)) ; tail context
+                   (t (list $if (first bools) true (list* $or? (rest bools)))))))
+         (op (make-builtin-operative body 'syms::$or?)))
+    (setf (%expander $or?) op)
+    (define $or? 'syms::$or? *defining-environment*))
   ;; Need static keys to define $and? and $or? as macros - TODO
   (defapp combiner? (object) ignore (boolify (typep object 'combiner)))
   (defapp append (&rest lists) ignore (reduce #'append lists))
