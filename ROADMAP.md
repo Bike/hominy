@@ -27,8 +27,13 @@ Anyway, quick TODO list, in no order:
   - design semantics
   - implement
  - arithmetic
-  - report's semantics should be fine, but check them
-  - implement
+  - X report's semantics should be fine, but check them
+  - X exact integers
+   - div, mod, some others
+   - fix arities
+  - inexact
+  - complex
+  - syntax
  - vectors
   - design semantics
   - typed vectors (good for bytevectors which are good for marshaling)

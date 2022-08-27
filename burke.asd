@@ -12,6 +12,7 @@
                   :depends-on ("defenv" "ptree" "interpret" "packages")
                   :components ((:file "ground")
                                (:file "static")
+                               (:file "numbers")
                                (:file "macro" :depends-on ("ground"))
                                (:file "core" :depends-on ("ground"))))
                  (:file "base" :depends-on ("lib" "packages"))))
