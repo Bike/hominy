@@ -10,6 +10,7 @@
                  (:file "defenv" :depends-on ("interpret" "packages"))
                  (:file "ground" :depends-on ("defenv" "interpret" "ptree" "packages"))
                  (:file "static" :depends-on ("defenv" "interpret" "packages"))
+                 (:file "macro" :depends-on ("defenv" "ground" "interpret" "packages"))
                  (:file "core" :depends-on ("defenv" "ground" "interpret" "packages"))
                  (:file "base" :depends-on ("core" "static"))))
    (:file "packages" :depends-on ("interpreter"))
