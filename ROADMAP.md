@@ -15,99 +15,99 @@ My fundamental goal is to have a testbed language with very simple language sema
 Anyway, quick TODO list, in no order:
 
 - language
--- X core
---- X vau abstraction
----- X ptrees
---- X applicatives
---- X environments
--- mutation
---- iron out semantics
---- implement
--- I/O ports
---- design semantics
---- implement
--- arithmetic
---- report's semantics should be fine, but check them
---- implement
--- vectors
---- design semantics
---- typed vectors (good for bytevectors which are good for marshaling)
---- implement
--- marshaling
---- X basic implementation
---- finish + test semantics related to linking
---- expose to burke
--- generic functions
---- design semantics
---- make eval/lookup/combine generic?
--- continuations
---- escape/abort
---- delimited
---- guards
---- marks?
---- prompts?
--- conditions
---- syntax/operatives
---- hierarchy
--- dynamic binding
--- X static binding (i.e. the report's "gensyms")
---- convenient macrology (e.g. once-only)
--- X macros
---- X expose to Burke
--- types
--- type definition
---- generalize encapsulated types to hold multiple objects directly (more efficient i hope)
+ - X core
+  - X vau abstraction
+   - X ptrees
+  - X applicatives
+  - X environments
+ - mutation
+  - iron out semantics
+  - implement
+ - I/O ports
+  - design semantics
+  - implement
+ - arithmetic
+  - report's semantics should be fine, but check them
+  - implement
+ - vectors
+  - design semantics
+  - typed vectors (good for bytevectors which are good for marshaling)
+  - implement
+ - marshaling
+  - X basic implementation
+  - finish + test semantics related to linking
+  - expose to burke
+ - generic functions
+  - design semantics
+  - make eval/lookup/combine generic?
+ - continuations
+  - escape/abort
+  - delimited
+  - guards
+  - marks?
+  - prompts?
+ - conditions
+  - syntax/operatives
+  - hierarchy
+ - dynamic binding
+ - X static binding (i.e. the report's "gensyms")
+  - convenient macrology (e.g. once-only)
+ - X macros
+  - X expose to Burke
+ - types
+ - type definition
+  - generalize encapsulated types to hold multiple objects directly (more efficient i hope)
 - conforming kernel option
--- circularity
+ - circularity
 - compilation semantics
--- X draft
--- evaluate how well the compilation environment thing works
--- and what interface for making them is best
--- local compilation environments (e.g. type declarations)
--- macroexpansion
+ - X draft
+ - evaluate how well the compilation environment thing works
+ - and what interface for making them is best
+ - local compilation environments (e.g. type declarations)
+ - macroexpansion
 - modules
--- directives & syntax
--- implement
--- write standard library as module(s)?
+ - directives & syntax
+ - implement
+ - write standard library as module(s)?
 - running offline
--- C linking
--- ABI
--- native VM
+ - C linking
+ - ABI
+ - native VM
 - dynamic contexts
--- figure out what the hell
--- implement
--- integrate with generic functions
--- integrate with compilation environment?
+ - figure out what the hell
+ - implement
+ - integrate with generic functions
+ - integrate with compilation environment?
 - VM
--- X basic design
--- X implement
--- variable size jumps
--- variable size operands
--- explicit frame representation for continuations
--- better argument representation for applicatives?
+ - X basic design
+ - X implement
+ - variable size jumps
+ - variable size operands
+ - explicit frame representation for continuations
+ - better argument representation for applicatives?
 - assembler
--- X write
--- X forward labels
--- labels across functions
--- backward jumps
--- labels for entry points
--- X disassembler
---- resolve labels
---- more human readable output
+ - X write
+ - X forward labels
+ - labels across functions
+ - backward jumps
+ - labels for entry points
+ - X disassembler
+  - resolve labels
+  - more human readable output
 - treec
--- X core operation
--- X basic operatives
--- X vau forms (i.e. literal $vau in head)
---- with wrapping
--- X inline applicatives with VM equivalents
--- $letrec
--- direct calls
--- real tail calls
+ - X core operation
+ - X basic operatives
+ - X vau forms (i.e. literal $vau in head)
+  - with wrapping
+ - X inline applicatives with VM equivalents
+ - $letrec
+ - direct calls
+ - real tail calls
 - flowc
--- X IR design
--- X core operation
--- reorient myself
--- known operators
--- use local transformations (i.e. rewrites that only replace callees and then inline them)
--- other optimizations, e.g. LICM
--- optimize in parallel (callee transforms)
+ - X IR design
+ - X core operation
+ - reorient myself
+ - known operators
+ - use local transformations (i.e. rewrites that only replace callees and then inline them)
+ - other optimizations, e.g. LICM
+ - optimize in parallel (callee transforms)
