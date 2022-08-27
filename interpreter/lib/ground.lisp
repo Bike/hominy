@@ -59,6 +59,9 @@
   (defapp make-environment (&rest parents) ignore (apply #'make-environment parents))
   (defapp make-fixed-environment (symbols values &rest parents) ignore
     (apply #'make-fixed-environment symbols values parents))
+  (defapp make-immutable-environment (symbols values &rest parents) ignore
+    (apply #'make-immutable-environment symbols values parents))
+  (defapp copy-env-immutable (env) ignore (copy-env-immutable env))
   (defop  $define! (ptree form) env
     (bind-ptree ptree (eval form env)
                 (lambda (symbol val state)

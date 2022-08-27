@@ -14,7 +14,9 @@
   (:export #:macro #:make-macro)
   (:export #:ignore #:inert #:boolean #:true #:false)
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
-           #:make-uninitialized-fixed-environment #:initialize-fixed-environment)
+           #:make-uninitialized-fixed-environment #:initialize-fixed-environment
+           #:make-immutable-environment #:copy-env-immutable)
+  (:export #:make-cell #:cell-value)
   (:export #:*base*)
   (:export #:bind-ptree-to-vector)
   ;; Derived operative internals, for use with compilers
