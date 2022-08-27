@@ -8,11 +8,13 @@
                  (:file "ptree" :depends-on ("packages"))
                  (:file "marshal" :depends-on ("interpret" "packages"))
                  (:file "defenv" :depends-on ("interpret" "packages"))
-                 (:file "ground" :depends-on ("defenv" "interpret" "ptree" "packages"))
-                 (:file "static" :depends-on ("defenv" "interpret" "packages"))
-                 (:file "macro" :depends-on ("defenv" "ground" "interpret" "packages"))
-                 (:file "core" :depends-on ("defenv" "ground" "interpret" "packages"))
-                 (:file "base" :depends-on ("core" "static"))))
+                 (:module "lib"
+                  :depends-on ("defenv" "ptree" "interpret" "packages")
+                  :components ((:file "ground")
+                               (:file "static")
+                               (:file "macro" :depends-on ("ground"))
+                               (:file "core" :depends-on ("ground"))))
+                 (:file "base" :depends-on ("lib" "packages"))))
    (:file "packages" :depends-on ("interpreter"))
    (:file "repl" :depends-on ("interpreter" "packages"))
    (:module "vm"
