@@ -120,6 +120,38 @@
       (make-instance 'static-fixed-environment
         :parents parents :names namevec :vvec vvec))))
 
+;;; Like ptree-names but with static binders instead of symbols.
+(defun static-ptree-names (static-ptree)
+  (etypecase static-ptree
+    ((or ignore null) nil)
+    (static-binder (list static-ptree))
+    (cons (nconc (static-ptree-names (car static-ptree)) (static-ptree-names (cdr static-ptree))))))
+
+(defun static-bindings->namevec (bindings)
+  (coerce (loop for (static-ptree) in bindings nconc (static-ptree-names static-ptree)) 'vector))
+
+(defun bind-static-ptree (static-ptree value function state)
+  (etypecase static-ptree
+    (ignore state)
+    (null (unless (null value) (error "Too many arguments")) state)
+    (static-binder (funcall function static-ptree value state))
+    (cons (unless (consp value) (error "Not enough arguments"))
+     (let ((new (bind-static-ptree (car static-ptree) (car value) function state)))
+       (bind-static-ptree (cdr static-ptree) (cdr value) function new)))))
+
+(defun bind-static-ptree-to-vector (static-ptree value vec index)
+  (bind-static-ptree static-ptree value
+                     (lambda (symbol val index)
+                       (declare (cl:ignore symbol))
+                       (setf (svref vec index) val)
+                       (1+ index))
+                     index))
+
+(defun static-fill-values (bindings vec env)
+  (loop with index = 0
+        for (static-ptree form) in bindings
+        do (setf index (bind-static-ptree-to-vector static-ptree (eval form env) vec index))))
+
 (defenv *static* ()
   (defop  $make-static-key (&optional name) ignore
     (multiple-value-list (make-static-key name)))
@@ -128,8 +160,41 @@
   (defapp static-lookup (key environment) ignore (static-lookup key environment))
   ;; convenience applicative - like static-lookup but uses the dynenv.
   (defapp static-variable (key) dynenv (static-lookup key dynenv))
-  (defapp static-key? (object) ignore (static-key-p object))
-  (defapp static-binder? (object) ignore (static-binder-p object)))
+  (defpred static-key? static-key-p)
+  (defpred static-binder? static-binder-p)
+  ;; Like $let, but with static binders instead of variables.
+  ;; Useful for macros (where you'd bind a gensym in Lisp) despite being kind of impossible to
+  ;; write in literal code.
+  ;; The compiler will need to know special handling procedures for this.
+  (defop  $let-static (bindings &rest body) env
+    (let* ((names (static-bindings->namevec bindings))
+           (values (make-array (length names)))
+           (_ (static-fill-values bindings values env))
+           (new-env (make-static-fixed-environment names values env)))
+      (declare (cl:ignore _))
+      (apply #'$sequence new-env body)))
+  ;; ($once-only ((a valf)*) body*)
+  ;; First, evaluate body in an environment where A etc. are bound to forms that retrieve the
+  ;; values of fresh static keys in the dynamic environment.
+  ;; Then wrap that result in a $let-static that binds those keys to the VALFs. Return that.
+  ;; TODO: Make this into a macro for efficiency - see below for definition
+  ;; But maybe it doesn't matter, since only macroexpanders really need to use $once-only anyway.
+  (let (;; KLUDGE
+        (static-variable (lookup 'syms::static-variable *defining-environment*))
+        ($let-static (lookup 'syms::$let-static *defining-environment*)))
+    (defop  $once-only (bindings &rest body) env
+      (let* (;; analogous to the gensym list.
+             (statics
+               (mapcar (lambda (bind) (multiple-value-list (make-static-key (first bind))))
+                       bindings))
+             (forms (mapcar (lambda (static) (list static-variable (second static)))
+                            statics))
+             (new-env (make-fixed-environment (mapcar #'first bindings) forms env))
+             (result (apply #'$sequence new-env body)))
+        `(,$let-static (,@(mapcar (lambda (bind static)
+                                    `(,(first static) ,(eval (second bind) env)))
+                                  bindings statics))
+            ,result)))))
 
 #|
 ;;; Here is how make-keyed-static-variable would be implemented in terms of these.
@@ -139,3 +204,39 @@
       (list ($lambda (value env) (make-static-fixed-environment (list binder) (list value) env))
             (wrap ($vau () dynenv (static-lookup key dynenv)))))))
 |#
+
+#|
+$once-only is, of course, complicated.
+now,
+($once-only ((a aform) (b bform)) body)
+expands to
+($let-static (((#<a-binder-binder> #<a-key-binder>) ($make-static-key a))
+              ((#<b-binder-binder> #<b-key-binder>) ($make-static-key b)))
+ `($let-static ((,(static-var #<a-binder-key>) ,aform)
+                (,(static-var #<b-binder-key>) ,bform))
+    ,($let-static ((a (static-var ,#<a-key-key>))
+                   (b (static-var ,#<b-key-key>)))
+  ,@body)))
+Actually it seems more practically convenient if the variables are bound to forms that do the lookup,
+i.e. static-var forms. This also hides the details of static keys from the disinterested coder.
+|#
+
+#+(or)
+(defun $once-only (bindings &rest body)
+  (let ((outer-statics
+          ;; These are the static keys that the once-only expansion uses to hold the static keys
+          ;; it creates. Oh boy. There are two for each - one for the binder and one for the reader.
+          (loop repeat (length bindings)
+                collect (list (multiple-value-list (make-static-key '#:once-only))
+                              (multiple-value-list (make-static-key '#:once-only))))))
+    `($let-static (,@(loop for ((bind-bind _1) (var-bind _2)) in outer-statics
+                           for (name _3) in bindings
+                           collect `((,bind-bind ,var-bind) ($make-static-key ,name))))
+       ;; The expansion now has bound the static keys, so start on what it returns.
+       `($let-static (,,@(loop for ((_1 bind-var) (_2 _3)) in outer-statics
+                               for (_4 form) in bindings
+                               collect ``(,(static-var ,bind-var) ,,form)))
+          ,($let (,@(loop for ((_1 _2) (_3 var-var)) in outer-statics
+                          for (name _) in bindings
+                          collect `(,name (list 'static-var (static-var ,var-var)))))
+             ,@body)))))

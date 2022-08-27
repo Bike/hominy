@@ -51,7 +51,7 @@ Anyway, quick TODO list, in no order:
   - hierarchy
  - dynamic binding
  - X static binding (i.e. the report's "gensyms")
-  - convenient macrology (e.g. once-only)
+  - X convenient macrology (e.g. once-only)
  - X macros
   - X expose to Burke
  - types
