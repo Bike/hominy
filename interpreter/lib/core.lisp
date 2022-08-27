@@ -62,7 +62,7 @@
              (eq b true))
            bools)))
   ;; Need static keys to define $and? and $or? as macros - TODO
-  (defapp combiner? (object) ignore (typep object 'combiner))
+  (defapp combiner? (object) ignore (boolify (typep object 'combiner)))
   (defapp append (&rest lists) ignore (reduce #'append lists))
   (defapp filter (app list) ignore
     (let ((under (unwrap app)))

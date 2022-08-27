@@ -53,9 +53,9 @@
   (defapp combine (combiner combinand env) ignore (combine combiner combinand env))
   (defapp lookup (symbol env) ignore (lookup symbol env))
   ;; ignores
-  (defapp ignore? (object) ignore (ignorep object))
+  (defpred ignore? ignorep)
   ;; environments
-  (defapp environment? (object) ignore (environmentp object))
+  (defpred environment? environmentp)
   (defapp make-environment (&rest parents) ignore (apply #'make-environment parents))
   (defapp make-fixed-environment (symbols values &rest parents) ignore
     (apply #'make-fixed-environment symbols values parents))
@@ -76,9 +76,9 @@
   ;; operatives
   (defop  $vau (ptree eparam &rest body) static
     (make-derived-operative static ptree eparam body))
-  (defapp operative? (object) ignore (operativep object))
+  (defpred operative? operativep)
   ;; applicatives
-  (defapp applicative? (object) ignore (applicativep object))
+  (defpred applicative? applicativep)
   (defapp wrap (combiner) ignore (wrap combiner))
   (defapp unwrap (applicative) ignore (unwrap applicative))
   ;; lists
@@ -91,19 +91,19 @@
     (if (typep cons 'cons)
         (cdr (the cons cons))
         (error 'type-error :datum cons :expected-type 'cons)))
-  (defapp cons? (object) ignore (consp object))
-  (defapp null? (object) ignore (null object))
+  (defpred cons? consp)
+  (defpred null? null)
   ;; symbols
-  (defapp symbol? (object) ignore (symbolp object))
+  (defpred symbol? symbolp)
   ;; equivalence
-  (defapp eq? (object1 object2) ignore (eql object1 object2))
+  (defapp eq? (object1 object2) ignore (boolify (eql object1 object2)))
   ;; booleans
   (defop  $if (condition then else) dynenv
     (let ((c (eval condition dynenv)))
       (cond ((eq c true) (eval then dynenv))
             ((eq c false) (eval else dynenv))
             (t (error 'type-error :datum c :expected-type 'boolean)))))
-  (defapp boolean? (object) ignore (booleanp object))
+  (defpred boolean? booleanp)
   ;; control
   (defop  $sequence (&rest forms) dynenv (apply #'$sequence dynenv forms))
   (defop  $let (bindings &rest body) env

@@ -40,6 +40,10 @@
   `(define (wrap (burke-operative ,name ,lambda-list ,eparam ,@body)) ',(isymify name)
      *defining-environment*))
 
+;;; Convenience: Define a type predicate.
+(defmacro defpred (name lisp-name)
+  `(defapp ,name (object) ignore (boolify (,lisp-name object))))
+
 (defmacro defmac (name lambda-list eparam &body body)
   `(define (make-macro (burke-operative ,name ,lambda-list ,eparam ,@body))
        ',(isymify name) *defining-environment*))
