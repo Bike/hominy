@@ -102,7 +102,9 @@ Anyway, quick TODO list, in no order:
  - X inline applicatives with VM equivalents
  - X mutation
   - inline $set!
- - $letrec
+ - inline $letrec
+ - macroexpand
+  - optimize combinations with literal operatives
  - direct calls
  - real tail calls
 - flowc
