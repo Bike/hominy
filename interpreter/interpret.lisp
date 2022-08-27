@@ -25,6 +25,41 @@
       (write-string "#inert" stream)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Environments
+;;;
+;;; Mutation semantics are as follows: there are three tiers of environments:
+;;; regular, fixed, and immutable. Regular environments are as described in Kernel.
+;;; Fixed environments cannot have new bindings added to them. Immutable environments
+;;; cannot have new bindings added and cannot have existing bindings modified.
+;;; ($set! ptree value) modifies existing bindings in env. These bindings are
+;;; inherited, i.e. you can modify existing bindings in a parent environment, which
+;;; is pretty different from Kernel. If a binding does not already exist an error
+;;; is signaled, and if the binding is in an immutable environment that's also an
+;;; error. This means that unlike Kernel, you can do usual Lisp closure state stuff.
+;;; ($define! ptree value) adds a binding to the dynamic environment, or modifies
+;;; an existing local binding if it exists. It is not possible to add bindings to
+;;; parent environments without direct access to them, providing access control
+;;; similar to Kernel's.
+;;;
+;;; $vau (and by extension $lambda, $let, etc) create fixed environments, in
+;;; order to make compilation sane. So it's not possible to e.g. shadow a
+;;; name from the static environment unless you do so in the initial binding.
+;;; Fixed environments can also be created directly with make-fixed-environment.
+;;; Regular environments are made by make-environment and that's about it.
+;;; To make an immutable environment, you can either use make-immutable-environment
+;;; which has the same syntax as make-fixed-environment, or you can use the
+;;; copy-env-immutable applicative, which is primarily useful for immutabilizing
+;;; regular environments after stuffing a bunch of definitions into them.
+;;;
+;;; Hypothetically we could have environments that have immutable bindings but
+;;; which you could add bindings to, but that seems pretty weird. And if you really
+;;; want you can get the same effect by making a regular child of an immutable.
+
+;;; Used for mutable bindings.
+;;; These are not Burke objects, so it is not possible for an immutable environment
+;;; to hold cells.
+(defstruct (cell (:constructor make-cell (value))) value)
 
 (defclass environment () ())
 (defun environmentp (object) (typep object 'environment))
@@ -32,35 +67,51 @@
 (declaim (ftype (function (environment) (or environment null)) parent))
 (defgeneric map-parents (function environment)
   (:argument-precedence-order environment function))
-(defgeneric local-lookup (symbol environment)
+(defgeneric local-cell (symbol environment)
   (:argument-precedence-order environment symbol)
   (:documentation "Check this environment (and not parents) for a value.
-If it exists, returns VALUE T; otherwise NIL NIL."))
+If it exists, returns CELL T; if the binding is immutable returns VALUE T;
+otherwise NIL NIL."))
 (defgeneric define (new symbol environment)
   (:argument-precedence-order environment symbol new)
-  (:documentation "Modify an existing binding, or create a new one.
-Note that it is not possible to create or modify bindings in a parent."))
+  (:documentation "Add a binding to the environment. If the symbol is already locally bound, the local binding is modified. An error is signaled if bindings cannot be added to the environment."))
 (defgeneric map-bindings (function environment)
   (:argument-precedence-order environment function)
-  (:documentation "Call FUNCTION on all symbols and values locally bound."))
+  (:documentation "Call FUNCTION on all symbols and cells in the environment (and not parents)."))
+
+(defun cell (symbol environment)
+  "Return the binding of SYMBOL in ENVIRONMENT. This is either a cell, for mutable environments, or the value, for immutable environments. If the symbol is not bound, an error is signaled. The search is carried out in Kernel's standard depth-first search order."
+  (labels ((aux (environment)
+             (multiple-value-bind (value presentp)
+                 (local-cell symbol environment)
+               (if presentp
+                   (return-from cell value)
+                   (map-parents #'aux environment)))))
+    (aux environment)
+    (error "Unbound variable ~a" symbol)))
 
 (defun lookup (symbol environment)
   "Find the value bound to SYMBOL in ENVIRONMENT.
 An environment with multiple parents is searched in depth-first order, as specified by Kernel.
 Signals an error if the symbol is not bound in the environment."
-  (labels ((aux (environment)
-             (multiple-value-bind (value presentp)
-                 (local-lookup symbol environment)
-               (if presentp
-                   (return-from lookup value)
-                   (map-parents #'aux environment)))))
-    (aux environment)
-    (error "Unbound variable ~a" symbol)))
+  (let ((cell (cell symbol environment)))
+    (if (cell-p cell)
+        (cell-value cell)
+        cell)))
+
+(defun (setf lookup) (new symbol environment)
+  "Set the value of an existing binding of SYMBOL in ENVIRONMENT to NEW.
+If the binding is immutable, an error is signaled.
+If the symbol is not already bound, an error is signaled. This function never creates new bindings."
+  (let ((cell (cell symbol environment)))
+    (if (cell-p cell)
+        (setf (cell-value cell) new)
+        (error "Cannot modify immutable binding of ~a" symbol))))
 
 (defun binds? (symbol environment)
   "Returns (Lisp) true iff symbol is bound in environment, directly or indirectly."
   (labels ((aux (environment)
-             (if (nth-value 1 (local-lookup symbol environment))
+             (if (nth-value 1 (local-cell symbol environment))
                  (return-from binds? t)
                  (map-parents #'aux environment))))
     (aux environment)
@@ -79,34 +130,28 @@ Signals an error if the symbol is not bound in the environment."
     (write (list (hash-table-count (regular-environment-table object))) :stream stream))
   object)
 
-(defun cell (symbol regular-environment)
-  (gethash symbol (regular-environment-table regular-environment)))
-(defun (setf cell) (new symbol regular-environment)
-  (setf (gethash symbol (regular-environment-table regular-environment)) new))
-
 (defmethod map-parents (function (env regular-environment))
   (mapc function (parents env)))
-(defmethod local-lookup (symbol (env regular-environment))
-  (multiple-value-bind (cell presentp) (cell symbol env)
-    (if presentp (values (car cell) t) (values nil nil))))
+(defmethod local-cell (symbol (env regular-environment))
+  (multiple-value-bind (cell presentp) (gethash symbol (regular-environment-table env))
+    (if presentp (values cell t) (values nil nil))))
 (defmethod define (new symbol (env regular-environment))
-  (multiple-value-bind (cell presentp) (cell symbol env)
-    (if presentp
-        (setf (car cell) new)
-        (setf (cell symbol env) (list new))))
+  (let ((table (regular-environment-table env)))
+    (multiple-value-bind (cell presentp) (gethash symbol table)
+      (if presentp
+          (setf (cell-value cell) new)
+          (setf (gethash symbol table) (make-cell new)))))
   new)
 (defmethod map-bindings (function (env regular-environment))
-  ;; FIXME: This function is basically used for linking, and linking will need to
-  ;; be more aware of cells in the future.
-  (maphash (lambda (sym cell) (funcall function sym (car cell)))
-           (regular-environment-table env)))
+  (maphash function (regular-environment-table env)))
 
 (defun make-environment (&rest parents)
-  (make-instance 'regular-environment :parents parents))
+  (make-instance 'regular-environment :parents (copy-list parents)))
 
 ;;; An environment with a fixed set of bindings, suitable for LET and etc.
-;;; FIXME: Could also have cells. Honestly cells should probably be a totally
-;;; separate thing?
+;;; TODO: Large fixed (or immutable) environments could probably be accessed
+;;; more efficiently through perfect hashing or something.
+;;; Or at least we should do binary search.
 (defclass fixed-environment (environment)
   (;; Obviously LET doesn't produce an environment with multiple parents, but
    ;; it shouldn't be especially hard to support someone doing that if they
@@ -115,42 +160,73 @@ Signals an error if the symbol is not bound in the environment."
    (%names :initarg :names :reader names :type (simple-array symbol (*))
            ;; Set once in %augment2, below.
            :accessor %names)
-   (%vvec :initarg :vvec :reader vvec :type simple-vector
+   (%vvec :initarg :vvec :reader vvec :type (simple-array cell (*))
           :accessor %vvec)))
 
 (defmethod map-parents (function (env fixed-environment))
   (mapc function (parents env)))
-(defmethod local-lookup (symbol (env fixed-environment))
+(defmethod local-cell (symbol (env fixed-environment))
   (let ((pos (position symbol (names env))))
     (if pos
         (values (aref (vvec env) pos) t)
         (values nil nil))))
 (defmethod define (new symbol (env fixed-environment))
-  (let ((pos (position symbol (names env))))
-    (if pos
-        (setf (aref (vvec env) pos) new)
-        (error "New bindings cannot be added to a fixed environment ~a" env))))
+  (declare (ignore new))
+  (error "New binding for ~a cannot be added to environment ~a" symbol env))
 (defmethod map-bindings (function (env fixed-environment))
   (map nil function (names env) (vvec env)))
 
-(defun %augment (env names values)
+(defun make-fixed-environment (symbols values &rest parents)
   (make-instance 'fixed-environment
-    :parents (list env)
-    :names (coerce names 'vector) :vvec (coerce values 'vector)))
+    :parents (copy-list parents)
+    ;; Copy the arguments, so that they can't be weirdly mutated elsewhere later.
+    :names (map 'vector #'identity symbols)
+    :vvec (map 'vector #'make-cell values)))
 
 ;;; Two stage augment, used in the runtime.
 (defun %augment1 (env)
   (make-instance 'fixed-environment :parents (list env)))
 (defun %augment2 (env names values)
-  (setf (%names env) (coerce names 'vector)
-        (%vvec env) (coerce values 'vector))
+  (setf (%names env) (map 'vector #'identity names)
+        (%vvec env) (map 'vector #'make-cell values))
   env)
 
-(defun make-fixed-environment (symbols values &rest parents)
-  (make-instance 'fixed-environment
-    :parents parents
-    :names (coerce symbols 'vector)
-    :vvec (coerce values 'vector)))
+(defclass immutable-environment (environment)
+  ((%parents :initarg :parents :reader parents)
+   (%names :initarg :names :reader names :type (simple-array symbol (*)))
+   (%vvec :initarg :vvec :reader vvec :type simple-vector)))
+
+(defmethod map-parents (function (env immutable-environment))
+  (mapc function (parents env)))
+(defmethod local-cell (symbol (env immutable-environment))
+  (let ((pos (position symbol (names env))))
+    (if pos
+        (values (aref (vvec env) pos) t)
+        (values nil nil))))
+(defmethod define (new symbol (env immutable-environment))
+  (declare (ignore new))
+  (error "New binding for ~a cannot be added to environment ~a" symbol env))
+(defmethod map-bindings (function (env immutable-environment))
+  (map nil function (names env) (vvec env)))
+
+(defun make-immutable-environment (symbols values &rest parents)
+  (make-instance 'immutable-environment
+    :parents (copy-list parents)
+    :names (map 'vector #'identity symbols)
+    :vvec (map 'vector #'identity values)))
+
+(defun copy-env-immutable (env)
+  (if (typep env 'immutable-environment)
+      env
+      (let ((names nil) (values nil))
+        (map-bindings (lambda (name cell)
+                        (push name names)
+                        (push (cell-value cell) values))
+                      env)
+        (make-instance 'immutable-environment
+          :parents (parents env)
+          :names (map 'vector #'identity names)
+          :vvec (map 'vector #'identity values)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

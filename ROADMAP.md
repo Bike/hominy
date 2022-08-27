@@ -20,9 +20,9 @@ Anyway, quick TODO list, in no order:
    - X ptrees
   - X applicatives
   - X environments
- - mutation
-  - iron out semantics
-  - implement
+ - X mutation
+  - X iron out semantics
+  - X implement
  - I/O ports
   - design semantics
   - implement
@@ -100,6 +100,7 @@ Anyway, quick TODO list, in no order:
  - X vau forms (i.e. literal $vau in head)
   - with wrapping
  - X inline applicatives with VM equivalents
+ - mutation
  - $letrec
  - direct calls
  - real tail calls

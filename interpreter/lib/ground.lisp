@@ -24,7 +24,7 @@
            (declare (cl:ignore dynamic-env))
            (let ((vvec (make-array nnames)))
              (funcall augmenter combinand vvec)
-             (%augment static-env names-vec vvec))))))
+             (make-fixed-environment names-vec vvec static-env))))))
     (symbol
      (multiple-value-bind (names augmenter) (ptree-augmenter ptree 1)
        (declare (type (function (t simple-vector)) augmenter))
@@ -34,7 +34,7 @@
            (let ((vvec (make-array nnames)))
              (setf (svref vvec 0) dynamic-env)
              (funcall augmenter combinand vvec)
-             (%augment static-env names-vec vvec))))))))
+             (make-fixed-environment names-vec vvec static-env))))))))
 
 (defun make-derived-operative (static-env ptree eparam body)
   (let ((aug (make-augmenter static-env ptree eparam)))
@@ -59,11 +59,18 @@
   (defapp make-environment (&rest parents) ignore (apply #'make-environment parents))
   (defapp make-fixed-environment (symbols values &rest parents) ignore
     (apply #'make-fixed-environment symbols values parents))
-  (defop  $define! (name form) env
-    (bind-ptree name (eval form env)
+  (defop  $define! (ptree form) env
+    (bind-ptree ptree (eval form env)
                 (lambda (symbol val state)
                   (declare (cl:ignore state))
                   (define val symbol env))
+                nil)
+    inert)
+  (defop  $set! (ptree form) env
+    (bind-ptree ptree (eval form env)
+                (lambda (symbol value state)
+                  (declare (cl:ignore state))
+                  (setf (lookup symbol env) value))
                 nil)
     inert)
   ;; operatives
@@ -102,11 +109,11 @@
   (defop  $let (bindings &rest body) env
     (let* ((names (bindings->namesvec bindings))
            (values (make-array (length names)))
-           (new-env (%augment env names values)))
-      (fill-values bindings values env)
+           (_ (fill-values bindings values env))
+           (new-env (make-fixed-environment names values env)))
+      (declare (cl:ignore _))
       (apply #'$sequence new-env body)))
-  ;; Given our fixed environments, $letrec actually can't be derived.
-  ;; It also has slightly different behavior from Kernel with respect to forms
+  ;; This has slightly different behavior from Kernel with respect to forms
   ;; that immediately evaluate the newly bound names. In Kernel, doing such will
   ;; get you the outside binding value if there is one, or else error with an
   ;; unbound variable. (This is not stated outright but is the behavior of the
@@ -117,7 +124,11 @@
   (defop  $letrec (bindings &rest body) env
     (let* ((names (bindings->namesvec bindings))
            (values (make-array (length names) :initial-element inert))
-           (new-env (%augment env names values)))
-      (fill-values bindings values new-env)
+           (new-env (make-fixed-environment names values env)))
+      (bind-ptree (mapcar #'first bindings) (mapcar #'second bindings)
+                  (lambda (name form state)
+                    (declare (cl:ignore state))
+                    (setf (lookup name new-env) (eval form new-env)))
+                  nil)
       (apply #'$sequence new-env body)))
   (defapp exit (&rest values) ignore (throw 'abort values)))

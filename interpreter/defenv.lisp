@@ -10,7 +10,7 @@
 (defmacro envspec ((&rest parents) &body body)
   `(let ((*defining-environment* (make-environment ,@parents)))
      ,@body
-     *defining-environment*))
+     (copy-env-immutable *defining-environment*)))
 
 ;;; Define a Lisp function that can be used as the function of a builtin Burke operative,
 ;;; i.e. it takes two arguments, the dynamic environment and the combinand.
