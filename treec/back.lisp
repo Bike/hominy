@@ -62,9 +62,7 @@
                    (make-instance 'context
                      :cfunction cf :link-env link-env :locals locals
                      :nregs ptree-nregs :nstack 0))
-        ;; We need at least two registers for the XEP to work.
-        ;; FIXME: If we don't need a XEP we don't need those registers.
-        (setf (asm:nlocals cf) (max 2 *regs-hwm*) (asm:nstack cf) *stack-hwm*)))
+        (setf (asm:nlocals cf) *regs-hwm* (asm:nstack cf) *stack-hwm*)))
     cf))
 
 (defun linearize-ptree (ptree)
