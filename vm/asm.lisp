@@ -3,7 +3,8 @@
 ;;; A module being compiled.
 (defclass cmodule ()
   ((%cfunctions :initform nil :accessor cfunctions :type list)
-   (%constants :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader constants)))
+   (%constants :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader constants)
+   (%annotations :initform nil :accessor annotations)))
 
 (defgeneric constant-index (thing value))
 (defmethod constant-index ((cmodule cmodule) value)
@@ -17,12 +18,24 @@
    (%ptree :initarg :ptree :initform (error "missing arg") :reader ptree)
    (%eparam :initarg :eparam :initform (error "missing arg") :reader eparam)
    (%bytecode :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader bytecode)
+   (%annotations :initform nil :accessor annotations)
    (%sep :accessor sep :type (and unsigned-byte fixnum)) ; xep is 0
    (%nlocals :initform 0 :accessor nlocals :type (and unsigned-byte fixnum))
    (%nstack :initform 0 :accessor nstack :type (and unsigned-byte fixnum))
    (%closed :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader closed
             :type (array t (*)))
    (%name :initform nil :initarg :name :accessor name)))
+
+;;; A thing we need to note somehow during final assembly.
+(defclass annotation ()
+  (;; The position in the bytecode that the annotation affects, i.e. the position that will
+   ;; need some kind of editing/resolution.
+   (%position :initform nil :accessor annotation-position :type (or null (integer 0)))))
+
+(defun annotate (cfunction annotation)
+  (assert (annotation-position annotation))
+  (setf (annotations cfunction)
+        (merge 'list (list annotation) (annotations cfunction) #'< :key #'annotation-position)))
 
 (defmethod initialize-instance :after ((inst cfunction) &key cmodule (name nil namep)
                                        &allow-other-keys)
@@ -41,14 +54,15 @@
 
 (defun nbytes (cfunction) (length (bytecode cfunction)))
 
-;;; A reference into the code vector that can't be resolved until linking.
+;;; A reference into the code vector that can't be resolved until later.
 ;;; TODO: Variable size labels and stuff. (Scary.)
-;;; TODO: Cross-operative labeling.
-(defclass label ()
-  (;; The position in the bytecode that needs to be replaced with the actual location.
-   (%fixup :initform nil :accessor label-fixup)))
+(defclass label (annotation)
+  (;; The position the label is at.
+   (%target :initform nil :accessor label-target)))
 
-(defun make-label (cfunction) (declare (ignore cfunction)) (make-instance 'label))
+(defun make-label (cfunction)
+  (declare (ignore cfunction))
+  (make-instance 'label))
 
 (defun assemble (cfunction &rest items)
   (loop with bytecode = (bytecode cfunction)
@@ -57,18 +71,27 @@
              (symbol ; treat as an instruction name
               (vector-push-extend (symbol-value item) bytecode))
              (label
-              (assert (null (label-fixup item))) ; no dupe assembly
-              (setf (label-fixup item) (vector-push-extend 0 bytecode)))
+              (assert (null (annotation-position item))) ; no dupe assembly
+              ;; Now that the label has actually been positioned, add it to the module
+              ;; so the linker can resolve it later, and of course also set the
+              ;; position that will need the resolution.
+              (setf (annotation-position item) (vector-push-extend 0 bytecode))
+              (annotate cfunction item))
              ((unsigned-byte 8) ; literal constant
               (vector-push-extend item bytecode)))))
 
-(defun emit-label (cfunction label)
-  (let* ((fixup (label-fixup label))
-         ;; -1 because jumps are relative to the opcode, not the label.
-         (diff (- (nbytes cfunction) fixup -1)))
-    (if (typep diff '(signed-byte 7))
-        (setf (aref (bytecode cfunction) fixup) (ldb (byte 8 0) diff))
-        (error "Diff too big: ~d" diff))))
+(defun emit-label (cfunction label) (setf (label-target label) (nbytes cfunction)))
+
+(defun resolve-annotations (cfunction)
+  (dolist (annotation (annotations cfunction))
+    (assert (typep annotation 'label))
+    (let* ((fixup (annotation-position annotation))
+           (target (label-target annotation))
+           ;; -1 because jumps are relative to the opcode, not the label.
+           (diff (- target fixup -1)))
+      (if (typep diff '(signed-byte 7))
+          (setf (aref (bytecode cfunction) fixup) (ldb (byte 8 0) diff))
+          (error "Diff too big: ~d" diff)))))
 
 ;;; Produce a vm:module and vm:codes from cfunction and its module, by resolving any
 ;;; unresolved labels (when that's a thing), concatenating the bytecode vector, etc.
@@ -90,7 +113,8 @@
                  for cfunction in cfunctions
                  for fbytecode = (bytecode cfunction)
                  for fend = (+ xep-start (length fbytecode))
-                 do (replace bytecode fbytecode :start1 xep-start)
+                 do (resolve-annotations cfunction)
+                    (replace bytecode fbytecode :start1 xep-start)
                  collect (make-instance 'vm:code
                            :module module :xep xep-start :sep (+ xep-start (sep cfunction))
                            :end fend :nregs (nlocals cfunction) :nstack (nstack cfunction)
