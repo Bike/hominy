@@ -1,11 +1,12 @@
 (defsystem :burke
-  :depends-on (:cl-conspack :trivial-garbage)
+  :depends-on (#+(or):cl-conspack :trivial-garbage)
   :components
   ((:module "interpreter"
     :depends-on ()
     :components ((:file "packages")
                  (:file "interpret" :depends-on ("packages"))
                  (:file "ptree" :depends-on ("packages"))
+                 #+(or) ; needs special conspack
                  (:file "marshal" :depends-on ("interpret" "packages"))
                  (:file "defenv" :depends-on ("interpret" "packages"))
                  (:module "lib"
