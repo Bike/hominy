@@ -14,6 +14,7 @@
   (:export #:assemble #:link #:make-label #:emit-label)
   (:export #:cmodule #:constant-index #:closure-index
            #:cfunction #:sep #:nlocals #:nstack #:closed #:nbytes)
-  (:export #:disassemble #:disassemble-bytecode))
+  (:export #:disassemble #:disassemble-bytecode)
+  (:export #:module))
 
 ;;; BURKE/VM/OPS specially defined in ops.lisp

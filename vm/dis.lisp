@@ -46,3 +46,16 @@
   (disassemble-bytecode (burke/vm:bytecode (burke/vm:module obj))
                         :start (vm:xep obj)
                         :end (vm:end obj)))
+
+(defmethod disassemble ((obj burke/interpreter:applicative))
+  (disassemble (burke/interpreter:unwrap obj)))
+
+(defun module ()
+  (burke/interpreter:make-fixed-environment
+   '(burke/interpreter/syms::disassemble)
+   (list (burke/interpreter:wrap
+          (burke/interpreter:make-builtin-operative
+           (lambda (env combinand)
+             (declare (ignore env))
+             (destructuring-bind (combiner) combinand
+               (disassemble combiner))))))))
