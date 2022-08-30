@@ -92,7 +92,10 @@
       ;; This is true even if the operative doesn't need a reified static environment:
       ;; because we have a vau form, the static and dynamic environments are one and the same,
       ;; and we're getting at the dynamic environment without consing up a local environment.
-      :free (if dynenv-bind-p (list* env-var (free combinern)) (free combinern))
+      :free (union (free combinandn)
+                   (if dynenv-bind-p
+                       (list* env-var (free combinern))
+                       (free combinern)))
       :static-env-var env-var :body body)))
 
 ;;; Used as an argument to COMBINE opcode when we know the environment is not needed.

@@ -53,6 +53,8 @@
                    (valns (mapcar (lambda (bind)
                                     (convert-form (second bind) envv cenv))
                                   bindings))
+                   (valns-free
+                     (reduce #'union valns :key #'free :initial-value ()))
                    (new-bindings (reduce #'append bindings
                                          :key (lambda (binding)
                                                 (ptree->bindings (first binding)))))
@@ -62,8 +64,10 @@
                    (reifiedp (member new-env-var free))
                    ;; If the new-env-var is free, we need the parent env-var too.
                    ;; Also, remove any variables that are actually bound here.
-                   (really-free (nset-difference (if reifiedp (list* envv free) free)
-                                                 (mapcar #'car new-bindings)))
+                   (really-free
+                     (union valns-free
+                            (nset-difference (if reifiedp (list* envv free) free)
+                                             (mapcar #'car new-bindings))))
                    ;; If it's not free, record that by storing the letn's env-var as nil.
                    (penv (if reifiedp new-env-var nil)))
               (make-instance 'letn
