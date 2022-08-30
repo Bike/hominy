@@ -79,12 +79,15 @@
   (let* ((body (body combinern))
          (bfree (free body))
          (eparam (eparam combinern))
+         (inner-reified-p (static-env-var combinern))
          ;; If the eparam exists and is free in the body, we gotta bind it.
-         (dynenv-bind-p (and (symbolp eparam) (member eparam bfree))))
+         ;; Also gotta bind it if the operative needs a reified inner environment.
+         (dynenv-bind-p (and (symbolp eparam)
+                             (or inner-reified-p (member eparam bfree)))))
     (make-instance 'letn
       :ptrees (list (ptree combinern)) :value-nodes (list combinandn)
       :dynenv-bind (if dynenv-bind-p eparam nil)
-      :inner-env-var (if (static-env-var combinern) (env-var combinern) nil)
+      :inner-env-var (if inner-reified-p (env-var combinern) nil)
       ;; If we need to bind the dynenv, it's free.
       ;; This is true even if the operative doesn't need a reified static environment:
       ;; because we have a vau form, the static and dynamic environments are one and the same,

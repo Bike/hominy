@@ -238,10 +238,14 @@
                     (setf context (context context :new-regs 1 :new-stack 1)))
                   (when inner-envv ; haveta reify
                     (asm:assemble cf 'o:ref outer-env-index)
+                    ;; get the dynenv for reification
+                    (when oeb (asm:assemble cf 'o:ref outer-env-index))
                     (loop for (_1 index _2) in bindings
                           do (asm:assemble cf 'o:ref index))
                     (asm:assemble cf 'o:make-environment
-                      (asm:constant-index cf (mapcar #'car bindings))
+                      (asm:constant-index cf (if oeb
+                                                 (cons oeb (mapcar #'car bindings))
+                                                 (mapcar #'car bindings)))
                       'o:set (nregs context))
                     ;; just to reiterate - local environments never need to be in cells.
                     (push (list inner-envv (nregs context) nil) bindings)
