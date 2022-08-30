@@ -24,7 +24,7 @@
           (cond ((not eparam-index) (values nil 0))
                 (cellp
                  (asm:assemble cfunction 'o:arg 1 'o:make-cell 'o:set eparam-index)
-                 (values (list (list eparam eparam-index cellp) 1)))
+                 (values (list (list eparam eparam-index cellp)) 1))
                 (t
                  (asm:assemble cfunction 'o:arg 1 'o:set eparam-index)
                  (values (list (list eparam eparam-index cellp)) 1)))
