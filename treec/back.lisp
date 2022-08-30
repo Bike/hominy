@@ -1,8 +1,5 @@
 (in-package #:burke/treec)
 
-;;; Magic marker used to indicate the static environment needs to be linked here.
-(defvar *static-env-link-marker* (cons nil nil))
-
 (defvar *regs-hwm*) ; how many locals have we used?
 (defvar *stack-hwm*) ; and how much stack?
 
@@ -48,15 +45,16 @@
   (let* ((cf (make-instance 'asm:cfunction
                :ptree (ptree operative) :eparam (eparam operative)
                :cmodule cmodule))
-         (closes-env-p (closes-env-p operative)))
+         (static-env-var (static-env-var operative)))
     (multiple-value-bind (locals ptree-nregs ptree-nstack)
         (gen-operative-bindings cf (ptree operative) (eparam operative)
-                                (if closes-env-p (env-var operative) nil))
+                                (if static-env-var (env-var operative) nil))
       (setf (asm:sep cf) (asm:nbytes cf))
-      (when closes-env-p
+      (when static-env-var
         ;; if the environment is reified, close over the static environment.
-        ;; Note that ptree.lisp needs this to be at closure 0.
-        (asm:closure-index cf *static-env-link-marker*))
+        ;; Note that ptree.lisp needs this to be at closure 0, hence forcing it
+        ;; to be the first closed over variable.
+        (asm:closure-index cf static-env-var))
       (let ((*regs-hwm* ptree-nregs) (*stack-hwm* ptree-nstack))
         (translate (body operative)
                    (make-instance 'context
@@ -200,21 +198,12 @@
   (when (valuep context)
     (let* ((cf (cfunction context))
            (opcf (translate-operative node (link-env context) (asm:cmodule cf)))
-           (free (free node))
-           ;; If we're inside an ENCLOSE node, that pushed the static env and left
-           ;; the rest to us. (KLUDGE)
-           (nclosed (if (closes-env-p node) (1+ (length free)) (length free))))
-      (mark-stack (+ nclosed (nstack context)))
+           (free (free node)))
+      (mark-stack (+ (length free) (nstack context)))
       (loop for var in free
             do (symbol-binding var context))
       (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))
       (when (tailp context) (asm:assemble cf 'o:return)))))
-
-(defmethod translate ((node enclose) context)
-  (when (valuep context)
-    ;; See KLUDGE in TRANSLATE OPERATIVE
-    (symbol-binding (env-var node) context)
-    (translate (operative node) context)))
 
 (defmethod translate ((node letn) orig-context)
   (loop with context = (context orig-context :valuep t :tailp nil)
@@ -228,8 +217,8 @@
                                                 :new-stack nstack :valuep t :tailp nil))
                  bindings)
           into bindings
-        finally (let* ((outer-envv (env-var node))
-                       (oeb (outer-env-bind node))
+        finally (let* ((outer-envv (static-env-var node))
+                       (oeb (dynenv-bind node))
                        (inner-envv (inner-env-var node))
                        (cellp inner-envv)
                        (outer-env-index

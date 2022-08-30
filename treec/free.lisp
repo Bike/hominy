@@ -3,6 +3,7 @@
 ;;; Return a list of lvars free in NODE.
 (defgeneric free (node))
 
+;; OPERATIVE and LETN have FREE as a slot reader.
 (defmethod free ((link link)) nil)
 (defmethod free ((ref ref)) (list (ref-symbol ref)))
 (defmethod free ((const const)) nil)
@@ -17,5 +18,7 @@
          (reduce #'union (for-effect seq) :key #'free :initial-value ())))
 (defmethod free ((ifn ifn))
   (union (free (if-cond ifn)) (union (free (then ifn)) (free (else ifn)))))
-(defmethod free ((op enclose))
-  (adjoin (env-var op) (free (operative op))))
+#|
+;;; Returns a list of lvars something in NODE closes over, i.e. that are free in some suboperative.
+(defgeneric encloses
+|#

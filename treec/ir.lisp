@@ -13,24 +13,15 @@
    (%free :initarg :free :reader free :type list)
    ;; True iff the operative uses its static environment arbitrarily
    ;; (i.e. if it needs to be reified by the encloser)
-   (%closes-env-p :initarg :closes-env-p :reader closes-env-p :type boolean)
+   ;; NIL if the operative doesn't need a reified outer environment;
+   ;; otherwise the variable for the outer environment.
+   (%static-env-var :initarg :static-env-var :reader static-env-var :type (or null symbol))
    ;; A symbol uses internally to refer to the local environment.
    (%env-var :initarg :env-var :reader env-var :type symbol)))
 (defmethod info ((node operative))
   (make-instance 'info:local-operative
     :data node
-    :dynenvp (closes-env-p node)))
-
-;;; Indicator that an operative needs a reified environment.
-;;; This essentially exists so that FREE can get at the appropriate env-var.
-;;; A lack of ENCLOSE does not mean that the operative won't have to be a closure,
-;;; just that it doesn't have to close over its static environment.
-(defclass enclose (node)
-  ((%operative :initarg :operative :reader operative :type operative)
-   (%env-var :initarg :env-var :reader env-var :type symbol)))
-(defun make-enclose (operative env-var)
-  (make-instance 'enclose :operative operative :env-var env-var))
-(defmethod info ((node enclose)) (info (operative node)))
+    :dynenvp (if (static-env-var node) t nil)))
 
 ;; Reference to a "global" variable, i.e. one not bound within the operative being
 ;; compiled, i.e. from its static environment.
@@ -98,10 +89,12 @@
   ((%ptrees :initarg :ptrees :reader ptrees :type list)
    (%value-nodes :initarg :value-nodes :reader value-nodes :type list)
    ;; The variable bound to the environment the $let is evaluated in.
-   (%env-var :initarg :env-var :reader env-var :type symbol)
-   ;; A variable the $let will bind to the outer environment
+   (%static-env-var :initarg :static-env-var :reader static-env-var :type symbol)
+   ;; A variable the $let will bind to the environment it is evaluated in
    ;; (for conversion of inline operatives), or NIL if not bound.
-   (%outer-env-bind :initform nil :initarg :outer-env-bind :reader outer-env-bind :type symbol)
+   ;; The static and dynamic environments coincide for $LET, but these two slots
+   ;; have different names anyway to reflect how they originate.
+   (%dynenv-bind :initform nil :initarg :dynenv-bind :reader dynenv-bind :type symbol)
    ;; A variable the body of the $let can use to refer to the environment established by the $let,
    ;; or NIL if not needed.
    (%inner-env-var :initarg :inner-env-var :reader inner-env-var :type symbol)

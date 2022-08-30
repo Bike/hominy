@@ -1,7 +1,8 @@
 (in-package #:burke/treec)
 
 (defun %compile (ptree eparam body cenvironment environment)
-  (let* ((op (convert-operative ptree eparam body cenvironment))
+  (let* ((static-env-var (gensym "EXTERNAL-ENVIRONMENT"))
+         (op (convert-operative ptree eparam body static-env-var cenvironment))
          (cmod (make-instance 'asm:cmodule))
          (cf (translate-operative op environment cmod))
          (code (asm:link cf))
@@ -11,7 +12,7 @@
         (vm:enclose code
                     (map 'simple-vector
                          (lambda (item)
-                           (cond ((eq item *static-env-link-marker*) environment)
+                           (cond ((eq item static-env-var) environment)
                                  ((symbolp item) (i:lookup item environment))
                                  (t (error "How did ~a get in the closure vector?" item))))
                          closed)))))

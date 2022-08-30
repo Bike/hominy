@@ -20,19 +20,22 @@
       (symbol (list* (cons eparam (make-local-binding)) binds))
       (i:ignore binds))))
 
-(defun convert-operative (ptree eparam body cenv)
+(defun convert-operative (ptree eparam body static-env-var cenv)
   (let* ((bindings (operative-bindings ptree eparam))
          (cenv (cenv:augment1 cenv bindings))
          (env-var (make-symbol "LOCAL-ENVIRONMENT"))
          (bodyn (convert-seq body env-var cenv))
          (free (free bodyn)))
-    (multiple-value-bind (really-free closes-env-p)
-        (if (member env-var free)
-            (values (delete env-var (nset-difference free (mapcar #'car bindings))) t)
-            (values (nset-difference free (mapcar #'car bindings)) nil))
+    (multiple-value-bind (really-free static-env-var)
+        (let* ((free-vars (nset-difference free (mapcar #'car bindings)))
+               (env-var-free-p (member env-var free))
+               (really-free (if env-var-free-p
+                                (list* static-env-var (delete env-var free-vars))
+                                free-vars)))
+          (values really-free (if env-var-free-p static-env-var nil)))
       (make-instance 'operative
         :ptree ptree :eparam eparam
-        :free really-free :closes-env-p closes-env-p :env-var env-var
+        :free really-free :static-env-var static-env-var :env-var env-var
         :body (convert-seq body env-var cenv)))))
 
 (defun convert-seq (forms env-var cenv)
@@ -77,14 +80,17 @@
          (bfree (free body))
          (eparam (eparam combinern))
          ;; If the eparam exists and is free in the body, we gotta bind it.
-         (outer-env-bind-p (and (symbolp eparam) (member eparam bfree))))
+         (dynenv-bind-p (and (symbolp eparam) (member eparam bfree))))
     (make-instance 'letn
       :ptrees (list (ptree combinern)) :value-nodes (list combinandn)
-      :outer-env-bind (if outer-env-bind-p eparam nil)
-      :inner-env-var (if (closes-env-p combinern) (env-var combinern) nil)
+      :dynenv-bind (if dynenv-bind-p eparam nil)
+      :inner-env-var (if (static-env-var combinern) (env-var combinern) nil)
       ;; If we need to bind the dynenv, it's free.
-      :free (if outer-env-bind-p (list* env-var (free combinern)) (free combinern))
-      :env-var env-var :body body)))
+      ;; This is true even if the operative doesn't need a reified static environment:
+      ;; because we have a vau form, the static and dynamic environments are one and the same,
+      ;; and we're getting at the dynamic environment without consing up a local environment.
+      :free (if dynenv-bind-p (list* env-var (free combinern)) (free combinern))
+      :static-env-var env-var :body body)))
 
 ;;; Used as an argument to COMBINE opcode when we know the environment is not needed.
 ;;; This facilitates the very important optimization of not referring to the local

@@ -24,11 +24,7 @@
   (make-seq
    (list combinern)
    (destructuring-bind (ptree eparam . body) combinand
-     (let ((op (convert-operative ptree eparam body cenv)))
-       ;; See note on defclass enclose for some explanation.
-       (if (closes-env-p op)
-           (make-enclose op envv)
-           op)))))
+     (convert-operative ptree eparam body envv cenv))))
 
 (defmethod convert-known-operation ((name (eql 'syms::$sequence))
                                     combinern combinand envv cenv)
@@ -71,5 +67,5 @@
                    ;; If it's not free, record that by storing the letn's env-var as nil.
                    (penv (if reifiedp new-env-var nil)))
               (make-instance 'letn
-                :ptrees ptrees :value-nodes valns :env-var envv :inner-env-var penv
+                :ptrees ptrees :value-nodes valns :static-env-var envv :inner-env-var penv
                 :free really-free :body body)))))))
