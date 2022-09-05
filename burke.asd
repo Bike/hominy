@@ -30,10 +30,6 @@
    (:file "info" :depends-on ("type" "packages"))
    (:file "compilation-environment" :depends-on ("interpreter" "info"
                                                                "packages"))
-   (:module "quickc"
-    :depends-on ("compilation-environment" "info" "vm" "interpreter")
-    :components ((:file "compile")
-                 (:file "known" :depends-on ("compile"))))
    (:module "treec"
     :depends-on ("compilation-environment" "info" "vm" "interpreter")
     :components ((:file "packages")
