@@ -90,3 +90,93 @@
          (values (append car-locals cdr-locals)
                  next-local
                  (max (+ 2 carnstack) (+ 1 cdrnstack))))))))
+
+;;; Generate code to parse arguments to the CEP. Returns stack used.
+;;; The CEP receives arg0 = dynenv, arg1 = car of combinand, arg2 = cadr, etc.
+;;; Any combiner's CEP can be called depending on the call site, even if it
+;;; doesn't really make sense for the combiner.
+(defun gen-cep (cfunction ptree eparam locals env-var)
+  (multiple-value-bind (ptmin ptmax) (compute-argcount ptree)
+    ;; The first arg is always the dynenv. And due to how the VM is set up,
+    ;; we'll always have at least that first arg, and we don't need to check..
+    (let ((min (1+ ptmin)) (max (if ptmax (1+ ptmax) ptmax)))
+      ;; Generate code to check the argcount.
+      (cond ((eql min max) (asm:assemble cfunction 'o:check-arg-count-= min))
+            ((> min 1) (asm:assemble cfunction 'o:check-arg-count->= min))
+            ((= min 1))
+            (t (error "BUG: Impossible")))
+      ;; Store the dynenv if we need to.
+      (let* ((destack
+               (etypecase eparam
+                 (symbol (let ((elocal (assoc eparam locals)))
+                           (assert elocal)
+                           (asm:assemble cfunction 'o:arg 0)
+                           (when (third elocal) ; cell needed
+                            (asm:assemble cfunction 'o:make-cell))
+                          (asm:assemble cfunction 'o:set (second elocal))
+                          1))
+                 (i:ignore 0)))
+             (ptstack (gen-cep-ptree cfunction ptree locals))
+             (estack
+               (cond (env-var
+                      ;; reify
+                      (asm:assemble cfunction 'o:closure 0)
+                      (loop for (sym index _) in locals
+                            unless (eq sym env-var)
+                              do (asm:assemble cfunction 'o:ref index)
+                              and collect sym into syms
+                            finally (asm:assemble cfunction 'o:make-environment
+                                      (asm:constant-index cfunction syms))
+                                    (return (1+ (length syms)))))
+                     (t 0))))
+        (max destack ptstack estack)))))
+
+;;; Returns (values min max). max may be NIL if anything is ok.
+(defun compute-argcount (ptree)
+  (etypecase ptree
+    (null (values 0 0))
+    ((or symbol i:ignore) (values 0 nil))
+    (cons (multiple-value-bind (min max) (compute-argcount (cdr ptree))
+            (values (1+ min) (if max (1+ max) nil))))))
+
+;;; Generate code to parse the ptree. Return the amount of stack used.
+(defun gen-cep-ptree (cfunction ptree locals &optional (index 1))
+  (etypecase ptree
+    ((or null i:ignore) 0) ; argcount already checked, so nothing to do
+    (symbol
+     (let ((local (assoc ptree locals)))
+       (assert local)
+       (asm:assemble cfunction 'o:listify-args index)
+       (when (third local) (asm:assemble cfunction 'o:make-cell))
+       (asm:assemble cfunction 'o:set (second local))
+       1))
+    ((cons i:ignore t) ; don't care, move on without using stack
+     (gen-cep-ptree cfunction (cdr ptree) locals (1+ index)))
+    (cons
+     (asm:assemble cfunction 'o:arg index)
+     (+ (gen-cep-ptree-aux cfunction (car ptree) locals) 1 ; for arg
+        (gen-cep-ptree cfunction (cdr ptree) locals (1+ index))))))
+
+;;; Break up an argument, which is on the stack.
+;;; Return the number of new stack slots used.
+(defun gen-cep-ptree-aux (cfunction ptree locals)
+  (etypecase ptree
+    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
+    (symbol (let ((local (assoc ptree locals)))
+              (assert local)
+              (when (third local) (asm:assemble cfunction 'o:make-cell))
+              (asm:assemble cfunction 'o:set (second local)))
+     0)
+    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
+    ((cons i:ignore t)
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
+     (max 1 (gen-cep-ptree-aux cfunction (cdr ptree) locals)))
+    ((cons t i:ignore)
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
+     (max 1 (gen-cep-ptree-aux cfunction (car ptree) locals)))
+    (cons
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
+     (let ((carstack (gen-cep-ptree-aux cfunction (car ptree) locals)))
+       (asm:assemble cfunction 'o:cdr)
+       (let ((cdrstack (gen-cep-ptree-aux cfunction (cdr ptree) locals)))
+         (max (1+ carstack) cdrstack))))))

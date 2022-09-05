@@ -7,7 +7,7 @@
   (:use #:cl)
   (:local-nicknames (#:syms #:burke/interpreter/syms))
   (:shadow #:eval #:boolean #:variable #:ignore)
-  (:export #:eval #:combine #:evalseq)
+  (:export #:eval #:combine #:call #:evalseq)
   (:export #:combiner #:operative #:applicative #:wrap #:unwrap
            #:make-builtin-operative #:make-derived-operative)
   (:export #:name)

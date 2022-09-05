@@ -115,7 +115,7 @@
                    cenv)))
     (declare (ignore _))
     (multiple-value-bind (bindings context nlocals nstack) (gen-ptree cf ptree)
-      (setf (asm:sep cf) (asm:nbytes (cfunction context)))
+      #+(or)(setf (asm:sep cf) (asm:nbytes (cfunction context)))
       ;; Set up the current environment to be in index 2.
       ;; We assume the closed over environment is in closure 0.
       (assemble context 'o:closure 0)

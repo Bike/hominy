@@ -6,7 +6,8 @@
             o:combine o:tail-combine o:lookup o:unwrap
             o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
      1)
-    ((o:ref o:set o:closure o:const o:arg o:listify-args o:list o:jump o:jump-if-true
+    ((o:ref o:set o:closure o:const o:arg o:listify-args
+            o:check-arg-count-= o:check-arg-count->= o:list o:jump o:jump-if-true
             o:enclose o:make-environment o:call o:tail-call)
      2)))
 
@@ -25,6 +26,7 @@
                 o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
          (fixed 0))
         ((o:ref o:set o:closure o:const o:arg o:listify-args o:list o:jump o:jump-if-true
+                o:check-arg-count-= o:check-arg-count->=
                 o:enclose o:make-environment o:call o:tail-call)
          (fixed 1))))))
 
@@ -44,7 +46,7 @@
 
 (defmethod disassemble ((obj vm:code))
   (disassemble-bytecode (burke/vm:bytecode (burke/vm:module obj))
-                        :start (vm:xep obj)
+                        :start (vm:gep obj)
                         :end (vm:end obj)))
 
 (defmethod disassemble ((obj burke/interpreter:applicative))

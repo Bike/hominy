@@ -19,7 +19,14 @@
    (%eparam :initarg :eparam :initform (error "missing arg") :reader eparam)
    (%bytecode :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader bytecode)
    (%annotations :initform nil :accessor annotations)
-   (%sep :accessor sep :type (and unsigned-byte fixnum)) ; xep is 0
+   ;; General entry point: Two args are the combinand and the dynamic environment.
+   (%gep :reader gep :type label :initform (make-label))
+   ;; Call entry point: Args are the dynenv, followed by the 1st element of the
+   ;; combinand, the second, etc. Good for applicatives.
+   (%cep :reader cep :type label :initform (make-label))
+   ;; Local entry point: Args are ignored. The frame is set up in some
+   ;; combiner-specific way.
+   (%lep :reader lep :type label :initform (make-label))
    (%nlocals :initform 0 :accessor nlocals :type (and unsigned-byte fixnum))
    (%nstack :initform 0 :accessor nstack :type (and unsigned-byte fixnum))
    (%closed :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader closed
@@ -28,14 +35,19 @@
 
 ;;; A thing we need to note somehow during final assembly.
 (defclass annotation ()
-  (;; The position in the bytecode that the annotation affects, i.e. the position that will
-   ;; need some kind of editing/resolution.
-   (%position :initform nil :accessor annotation-position :type (or null (integer 0)))))
+  (;; The function the annotation is in.
+   (%cfunction :initarg :cfunction :accessor annotation-cfunction)
+   ;; The position in the bytecode that the annotation affects,
+   ;; i.e. the position that will need some kind of editing/resolution.
+   ;; Relative to the cfunction.
+   (%position :initform nil :initarg :position :accessor annotation-position
+              :type (or null (integer 0)))))
 
 (defun annotate (cfunction annotation)
   (assert (annotation-position annotation))
   (setf (annotations cfunction)
-        (merge 'list (list annotation) (annotations cfunction) #'< :key #'annotation-position)))
+        (merge 'list (list annotation) (annotations cfunction) #'<
+               :key #'annotation-position)))
 
 (defmethod initialize-instance :after ((inst cfunction) &key cmodule (name nil namep)
                                        &allow-other-keys)
@@ -56,13 +68,18 @@
 
 ;;; A reference into the code vector that can't be resolved until later.
 ;;; TODO: Variable size labels and stuff. (Scary.)
-(defclass label (annotation)
-  (;; The position the label is at.
-   (%target :initform nil :accessor label-target)))
+(defclass label (annotation) ())
 
-(defun make-label (cfunction)
-  (declare (ignore cfunction))
-  (make-instance 'label))
+;;; A marker for something to resolve during linking.
+(defclass fixup (annotation) ())
+
+;;; A fixup that refers to a label: the position needs to be replaced with
+;;; wherever the label ends up.
+;;; (There might be other fixups later for like deciding if something needs a cell?)
+(defclass label-fixup (fixup)
+  ((%label :initarg :label :reader label :type label)))
+
+(defun make-label () (make-instance 'label))
 
 (defun assemble (cfunction &rest items)
   (loop with bytecode = (bytecode cfunction)
@@ -71,27 +88,35 @@
              (symbol ; treat as an instruction name
               (vector-push-extend (symbol-value item) bytecode))
              (label
-              (assert (null (annotation-position item))) ; no dupe assembly
-              ;; Now that the label has actually been positioned, add it to the module
-              ;; so the linker can resolve it later, and of course also set the
-              ;; position that will need the resolution.
-              (setf (annotation-position item) (vector-push-extend 0 bytecode))
-              (annotate cfunction item))
+              ;; We're referencing a label, so insert a 0, and record a fixup.
+              (annotate cfunction
+                        (make-instance 'label-fixup
+                          :cfunction cfunction :label item
+                          :position (vector-push-extend 0 bytecode))))
              ((unsigned-byte 8) ; literal constant
               (vector-push-extend item bytecode)))))
 
-(defun emit-label (cfunction label) (setf (label-target label) (nbytes cfunction)))
+;;; Mark where a label is in the cfunction.
+(defun emit-label (cfunction label)
+  (setf (annotation-cfunction label) cfunction
+        (annotation-position label) (nbytes cfunction)))
 
 (defun resolve-annotations (cfunction)
   (dolist (annotation (annotations cfunction))
-    (assert (typep annotation 'label))
-    (let* ((fixup (annotation-position annotation))
-           (target (label-target annotation))
-           ;; -1 because jumps are relative to the opcode, not the label.
-           (diff (- target fixup -1)))
+    (when (typep annotation 'fixup)
+      (resolve-fixup annotation))))
+
+(defgeneric resolve-fixup (fixup))
+(defmethod resolve-fixup ((fixup label-fixup))
+  (let* ((label (label fixup))
+         (cfunction (annotation-cfunction label))
+         (fpos (annotation-position fixup))
+         (target (annotation-position label))
+         ;; -1 because jumps are relative to the opcode, not the label.
+         (diff (- target fpos -1)))
       (if (typep diff '(signed-byte 7))
-          (setf (aref (bytecode cfunction) fixup) (ldb (byte 8 0) diff))
-          (error "Diff too big: ~d" diff)))))
+          (setf (aref (bytecode cfunction) fpos) (ldb (byte 8 0) diff))
+          (error "Diff too big: ~d" diff))))
 
 ;;; Produce a vm:module and vm:codes from cfunction and its module, by resolving any
 ;;; unresolved labels (when that's a thing), concatenating the bytecode vector, etc.
@@ -109,14 +134,17 @@
          (module (make-instance 'vm:module
                    :bytecode bytecode :constants constants))
          (codes
-           (loop for xep-start = 0 then fend
+           (loop for fstart = 0 then fend
                  for cfunction in cfunctions
                  for fbytecode = (bytecode cfunction)
-                 for fend = (+ xep-start (length fbytecode))
+                 for fend = (+ fstart (length fbytecode))
                  do (resolve-annotations cfunction)
-                    (replace bytecode fbytecode :start1 xep-start)
+                    (replace bytecode fbytecode :start1 fstart)
                  collect (make-instance 'vm:code
-                           :module module :xep xep-start :sep (+ xep-start (sep cfunction))
+                           :module module
+                           :gep (annotation-position (gep cfunction))
+                           :cep (annotation-position (cep cfunction))
+                           :lep (annotation-position (lep cfunction))
                            :end fend :nregs (nlocals cfunction) :nstack (nstack cfunction)
                            :nclosed (length (closed cfunction)) :name (name cfunction)))))
     (loop for i below nconstants

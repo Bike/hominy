@@ -4,7 +4,7 @@
                     (#:o #:burke/vm/ops))
   (:export #:module #:bytecode #:code #:closure #:enclose)
   ;; needed for disassemble
-  (:export #:xep #:end))
+  (:export #:gep #:end))
 
 (defpackage #:burke/vm/asm
   (:use #:cl)
@@ -13,7 +13,7 @@
                     (#:o #:burke/vm/ops))
   (:export #:assemble #:link #:make-label #:emit-label)
   (:export #:cmodule #:constant-index #:closure-index
-           #:cfunction #:sep #:nlocals #:nstack #:closed #:nbytes)
+           #:cfunction #:gep #:cep #:lep #:nlocals #:nstack #:closed #:nbytes)
   (:export #:disassemble #:disassemble-bytecode)
   (:export #:module))
 

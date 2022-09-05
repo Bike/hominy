@@ -29,13 +29,14 @@
 
 (defclass code (i:operative)
   ((%module :initarg :module :reader module :type module)
-   ;; eXternal Entry Point: An index into the bytecode vector which control can be
-   ;; transferred to to combine the operative with the general calling convention.
-   (%xep :initarg :xep :reader xep :type (and unsigned-byte fixnum))
-   ;; Specific Entry Point: An index into the bytecode vector which control can be
-   ;; transferred to to combine the operative with a simpler calling convention
-   ;; peculiar to the operative.
-   (%sep :initarg :sep :reader sep :type (and unsigned-byte fixnum))
+   ;; General entry point: Two args are the combinand and the dynamic environment.
+   (%gep :initarg :gep :reader gep :type (and unsigned-byte fixnum))
+   ;; Call entry point: Args are the dynenv, followed by the 1st element of the
+   ;; combinand, the second, etc. Good for applicatives.
+   (%cep :initarg :cep :reader cep :type (and unsigned-byte fixnum))
+   ;; Local entry point: Args are ignored. The frame is set up in some
+   ;; combiner-specific way.
+   (%lep :initarg :lep :reader lep :type (and unsigned-byte fixnum))
    ;; Index into the bytecode where this function ends. Used for debugging.
    (%end :initarg :end :reader end :type (and unsigned-byte fixnum))
    ;; Size of the register file needed for this operative.
@@ -88,6 +89,18 @@
         ((#.o:const) (spush (constant (next-code))) (incf ip))
         ((#.o:arg) (spush (nth (next-code) args)) (incf ip))
         ((#.o:listify-args) (spush (nthcdr (next-code) args)) (incf ip))
+        ((#.o:check-arg-count-=)
+         (let ((expected (next-code)))
+           (unless (= expected (length args))
+             (error "Argcount mismatch: Expected ~d, got ~d"
+                    expected (length args))))
+         (incf ip))
+        ((#.o:check-arg-count->=)
+         (let ((expected (next-code)))
+           (unless (= expected (length args))
+             (error "Argcount mismatch: Expected ~d, got ~d"
+                    expected (length args))))
+         (incf ip))
         ((#.o:make-cell) (spush (i:make-cell (spop))) (incf ip))
         ((#.o:cell-ref) (spush (i:cell-value (spop))) (incf ip))
         ((#.o:cell-set) (setf (i:cell-value (spop)) (spop)) (incf ip))
@@ -124,6 +137,13 @@
            (spush (i:make-fixed-environment-with-cells
                    names (gather (length names)) (spop))))
          (incf ip))
+        ((#.o:call)
+         (let ((args (gather (next-code))) (combiner (spop)))
+           (spush (apply #'i:call combiner args)))
+         (incf ip))
+        ((#.o:tail-call)
+         (let ((args (gather (next-code))) (combiner (spop)))
+           (return-from vm (apply #'i:call combiner args))))
         ;; call, tail-call
         ((#.o:err-if-not-cons)
          (let ((object (spop)))
@@ -139,16 +159,23 @@
              (error 'type-error :datum object :expected-type 'i:boolean)))
          (incf ip))))))
 
+(defun vm-call (code closed args start-ip)
+  (let ((module (module code))
+        (frame (make-frame (nregs code) (nstack code))))
+    (vm (bytecode module) frame closed (constants module) args :ip start-ip)))
+
 ;;; CODEs can be used directly as combiners iff they are not closures.
 (defmethod i:combine ((combiner code) combinand env)
   (assert (zerop (nclosed combiner)))
-  (let ((module (module combiner))
-        (frame (make-frame (nregs combiner) (nstack combiner))))
-    (vm (bytecode module) frame #() (constants module) (list combinand env) :ip (xep combiner))))
+  (vm-call combiner #() (list combinand env) (gep combiner)))
 
 (defmethod i:combine ((combiner closure) combinand env)
-  (let* ((code (code combiner))
-         (closed (closed combiner))
-         (module (module code))
-         (frame (make-frame (nregs code) (nstack code))))
-    (vm (bytecode module) frame closed (constants module) (list combinand env) :ip (xep code))))
+  (let ((code (code combiner)))
+    (vm-call code (closed combiner) (list combinand env) (gep code))))
+
+(defmethod i:call ((combiner code) env &rest combinand)
+  (vm-call combiner #() (list* env combinand) (cep combiner)))
+
+(defmethod i:call ((combiner closure) env &rest combinand)
+  (let ((code (code combiner)))
+    (vm-call code (closed combiner) (list* env combinand) (cep code))))

@@ -239,6 +239,9 @@ If the symbol is not already bound, an error is signaled. This function never cr
 
 (defgeneric eval (form env))
 (defgeneric combine (combiner combinand env))
+;;; This basically exists for the sake of the VM, which can be smarter.
+(defgeneric call (combiner env &rest combinand)
+  (:method (combiner env &rest combinand) (combine combiner combinand env)))
 
 (defmethod eval ((form symbol) env) (lookup form env))
 (defmethod eval ((form cons) env)

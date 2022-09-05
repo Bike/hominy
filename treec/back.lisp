@@ -46,22 +46,31 @@
                :ptree (ptree operative) :eparam (eparam operative)
                :cmodule cmodule))
          (static-env-var (static-env-var operative)))
+    (asm:emit-label cf (asm:gep cf))
     (multiple-value-bind (locals ptree-nregs ptree-nstack)
         (gen-operative-bindings cf (ptree operative) (eparam operative)
                                 (if static-env-var (env-var operative) nil))
-      (setf (asm:sep cf) (asm:nbytes cf))
-      (when static-env-var
-        ;; if the environment is reified, close over the static environment.
-        ;; Note that ptree.lisp needs this to be at closure 0, hence forcing it
-        ;; to be the first closed over variable.
-        (asm:closure-index cf static-env-var))
-      (let ((*regs-hwm* ptree-nregs) (*stack-hwm* ptree-nstack))
-        (translate (body operative)
-                   (make-instance 'context
-                     :cfunction cf :link-env link-env :locals locals
-                     :nregs ptree-nregs :nstack 0))
-        (setf (asm:nlocals cf) *regs-hwm* (asm:nstack cf) *stack-hwm*)))
-    cf))
+      ;; Jump over the CEP to the body.
+      ;; It might be faster to choose the more common of the CEP or GEP to
+      ;; proceed into the LEP... but that's probably premature optimization.
+      (asm:assemble cf o:jump (asm:lep cf))
+      (asm:emit-label cf (asm:cep cf))
+      (let ((cep-nstack (gen-cep cf (ptree operative) (eparam operative) locals
+                                 (if static-env-var (env-var operative) nil))))
+        (asm:emit-label cf (asm:lep cf))
+        (when static-env-var
+          ;; if the environment is reified, close over the static environment.
+          ;; Note that ptree.lisp needs this to be at closure 0, hence forcing it
+          ;; to be the first closed over variable.
+          (asm:closure-index cf static-env-var))
+        (let ((*regs-hwm* ptree-nregs)
+              (*stack-hwm* (max ptree-nstack cep-nstack)))
+          (translate (body operative)
+                     (make-instance 'context
+                       :cfunction cf :link-env link-env :locals locals
+                       :nregs ptree-nregs :nstack 0))
+          (setf (asm:nlocals cf) *regs-hwm* (asm:nstack cf) *stack-hwm*)))
+      cf)))
 
 (defun linearize-ptree (ptree)
   (etypecase ptree
@@ -108,6 +117,7 @@
 
 (defmethod translate ((node combination) context)
   (or (translate-primitive node context)
+      (translate-call node context)
       (translate-general-combination node context)))
 
 ;;; If the combiner is a primitive operative, and the combinand is a list of valid length,
@@ -144,11 +154,32 @@
                   (t nil))))
         nil)))
 
+(defun translate-call (node context)
+  (let ((combinand (combinand node))
+        (cf (cfunction context)))
+    (cond
+      ((typep combinand 'listn) ; generate a call
+       (translate (combiner node) (context context :valuep t :tailp nil))
+       (translate (env node) (context context :valuep t :tailp nil :new-stack 1))
+       ;; Translate the arguments
+       (loop for i from 2 for node in (elements combinand)
+             for ctxt = (context context :new-stack i :valuep t :tailp nil)
+             do (translate node ctxt))
+       (cond ((tailp context)
+              (asm:assemble cf 'o:tail-call (1+ (length (elements combinand)))))
+             (t
+              (asm:assemble cf 'o:call (1+ (length (elements combinand))))
+              (unless (valuep context)
+                (asm:assemble cf 'o:drop))))
+       t)
+      (t nil))))
+
 (defun translate-general-combination (node context)
   (translate (combiner node) (context context :valuep t :tailp nil))
   (translate (combinand node) (context context :valuep t :tailp nil :new-stack 1))
   (translate (env node) (context context :valuep t :tailp nil :new-stack 2))
-  (asm:assemble (cfunction context) (if (tailp context) 'o:tail-combine 'o:combine)))
+  (asm:assemble (cfunction context) (if (tailp context) 'o:tail-combine 'o:combine))
+  (unless (valuep context) (asm:assemble (cfunction context) 'o:drop)))
 
 (defmethod translate ((node seq) context)
   (loop with fecontext = (context context :valuep nil)
@@ -180,9 +211,9 @@
 
 (defmethod translate ((node ifn) context)
   (let* ((cf (cfunction context))
-         (thenl (asm:make-label cf))
+         (thenl (asm:make-label))
          (tailp (tailp context))
-         (mergel (unless tailp (asm:make-label cf)))
+         (mergel (unless tailp (asm:make-label)))
          (rcontext (context context :new-stack 1)))
     (translate (if-cond node) (context context :valuep t :tailp nil))
     (asm:assemble cf 'o:dup 'o:err-if-not-bool)
