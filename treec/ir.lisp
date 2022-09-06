@@ -38,6 +38,11 @@
   ;; We could have more specific info due to e.g. local declarations.
   (make-instance 'ref :symbol symbol :info info))
 
+;; A $set! form.
+(defclass setn (node)
+  ((%ptree :initarg :ptree :reader ptree)
+   (%value :initarg :value :reader value :type node)))
+
 (defclass const (node)
   ((%value :initarg :value :reader value)))
 (defun make-const (value)

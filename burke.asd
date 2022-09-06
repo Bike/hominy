@@ -35,11 +35,11 @@
     :components ((:file "packages")
                  (:file "ptree" :depends-on ("packages"))
                  (:file "ir" :depends-on ("packages"))
-                 (:file "free" :depends-on ("ir"))
+                 (:file "free" :depends-on ("ptree" "ir"))
                  (:file "known" :depends-on ("ir"))
                  (:file "front" :depends-on ("known" "ir" "free" "packages"))
                  (:file "primitives" :depends-on ("front" "packages"))
-                 (:file "back" :depends-on ("ir" "primitives" "packages"))
+                 (:file "back" :depends-on ("free" "ir" "primitives" "packages"))
                  (:file "compile" :depends-on ("front" "back" "packages"))))
    (:module "ir"
     :depends-on ("info" "packages")

@@ -1,95 +1,123 @@
 (in-package #:burke/treec)
 
+;;; Return a list of symbols in the ptree, depth first car to cdr.
+(defun ptree-symbols (ptree)
+  (etypecase ptree
+    ((or i:ignore null) nil)
+    (symbol (list ptree))
+    (cons (append (ptree-symbols (car ptree)) (ptree-symbols (cdr ptree))))))
+
 ;;;; Code for generating ptree bindings. It's lengthy, so it's here.
 
-;;; Return a list of bindings (var index cellp)*, the index of the next free local,
-;;; and the amount of stack space used.
-(defun gen-operative-bindings (cfunction ptree eparam env-var)
-  (let* ((lin (linearize-ptree ptree))
-         (eparam-index (if (typep eparam 'i:ignore) nil 0))
+;;; Given a ptree, eparam, local environment variable, and set of variables to encell,
+;;; return a list of bindings (var index cellp)*.
+;;; If the local environment variable is NIL, proceed without reification.
+;;; A binding will be cellp only if either the local environment is reified,
+;;; or if the variable is a member of the enclosed set.
+(defun op-bindings (ptree eparam env-var enclosed-set)
+  ;; We order things as follows: eparam, then local environment,
+  ;; then the symbols in the ptree in depth first order (going car->cdr).
+  ;; If the eparam and/or the local environment aren't needed they're not bound.
+  (let* ((eparam-index (if (typep eparam 'i:ignore) nil 0))
          (local-env-index (cond ((not env-var) nil) (eparam-index 1) (t 0)))
-         (bind-start-index (cond (local-env-index (1+ local-env-index))
-                                 (eparam-index (1+ eparam-index))
-                                 (t 0)))
-         (cellp (if env-var t nil)))
-    (multiple-value-bind (pbinds nlocals pstack)
-        (cond ((eql ptree i:ignore)
-               ;; parameters are ignored - do exactly nothing. Saves one stack spot.
-               (values nil 0 0))
-              (t
-               (asm:assemble cfunction 'o:arg 0) ; push combinand for destructuring
-               (gen-ptree cfunction ptree bind-start-index cellp)))
-      (multiple-value-bind (dynenv-binds dynenv-stack)
-          ;; The dynenv is already argument 1, so we don't need much.
-          (cond ((not eparam-index) (values nil 0))
-                (cellp
-                 (asm:assemble cfunction 'o:arg 1 'o:make-cell 'o:set eparam-index)
-                 (values (list (list eparam eparam-index cellp)) 1))
-                (t
-                 (asm:assemble cfunction 'o:arg 1 'o:set eparam-index)
-                 (values (list (list eparam eparam-index cellp)) 1)))
-        (multiple-value-bind (ebinds estack)
-            ;; make (and bind) the local environment if we must.
-            (cond (env-var
-                   (asm:assemble cfunction 'o:closure 0) ; static environment
-                   (unless (typep eparam 'i:ignore)
-                     (asm:assemble cfunction 'o:ref eparam-index)) ; dynamic environment, to be bound
-                   ;; Note that we do not have to do anything special with cells here-
-                   ;; since the refs will either be values or cells or what-ever anyway,
-                   ;; and that's exactly what we want to put in the environment.
-                   (loop for var in lin
-                         do (asm:assemble cfunction 'o:ref (second (assoc var pbinds))))
-                   (asm:assemble cfunction 'o:make-environment
-                     (asm:constant-index cfunction (if eparam-index (list* eparam lin) lin))
-                     'o:set local-env-index)
-                   (values (list (list env-var local-env-index nil))
-                           (+ 1 ; static environment
-                              (if (typep eparam 'i:ignore) 0 1) ; dynamic environment
-                              (length lin))))
-                  (t (values nil 0)))
-          (values (append pbinds dynenv-binds ebinds)
-                  (+ nlocals (if eparam-index 1 0) (if env-var 1 0))
-                  (max pstack dynenv-stack estack)))))))
+         ;; Index to start binding ptree symbols at.
+         (index (cond (local-env-index (1+ local-env-index))
+                      (eparam-index (1+ eparam-index))
+                      (t 0))))
+    (labels ((cellp (sym) (if (or env-var (member sym enclosed-set)) t nil))
+             (aux (ptree)
+               (etypecase ptree
+                 ((or null i:ignore) nil)
+                 (symbol (prog1 (list (list ptree index (cellp ptree)))
+                           (incf index)))
+                 (cons (append (aux (car ptree)) (aux (cdr ptree)))))))
+      (let ((result (aux ptree)))
+        (when local-env-index
+          ;; The local environment variable is never modified or bound in an
+          ;; environment itself, so it never needs a cell.
+          (push (list env-var local-env-index nil) result))
+        (when eparam-index
+          (push (list eparam eparam-index (cellp eparam)) result))
+        result))))
 
-;;; Generate code to do argument parsing. The arguments will be stored into registers
-;;; starting with NEXT-LOCAL. If cellp is true, they'll all be cloistered.
-;;; Returns three values: An alist of bindings (i.e. (symbol index cellp)*), the index
-;;; of the next free local, and the amount of stack space used.
-;;; The combinand should be on the top of the stack.
-;;; At the end, destructuring will be complete and the stack will have that value popped.
-(defun gen-ptree (cfunction ptree next-local cellp)
+(defun ptree-bindings (ptree index env-var enclosed-set)
+  (labels ((cellp (sym) (if (or env-var (member sym enclosed-set)) t nil))
+           (aux (ptree)
+             (etypecase ptree
+               ((or null i:ignore) nil)
+               (symbol (prog1 (list (list ptree index (cellp ptree)))
+                         (incf index)))
+               (cons (append (aux (car ptree)) (aux (cdr ptree)))))))
+    (aux ptree)))
+
+;;; Generate code to bind the arguments into the frame,
+;;; and to reify and bind the local environment if necessary.
+;;; Return the amount of stack space used.
+(defun gen-operative-bindings (cfunction ptree eparam locals env-var)
+  (+
+   ;; ptree
+   (cond ((eql ptree i:ignore)
+          ;; parameters are ignored - do exactly nothing. Saves one stack spot.
+          0)
+         (t
+          (asm:assemble cfunction 'o:arg 0) ; push combinand for destructuring
+          (gen-ptree cfunction ptree locals)))
+   ;; eparam
+   (if (typep eparam 'i:ignore)
+       0
+       (destructuring-bind (eparam index cellp) (assoc eparam locals)
+         (declare (ignore eparam))
+         ;; The dynenv is already argument 1, so we don't need much.
+         (asm:assemble cfunction 'o:arg 1)
+         (when cellp (asm:assemble cfunction 'o:make-cell))
+         (asm:assemble cfunction 'o:set index)
+         1))
+   ;; local environment
+   (if env-var
+       (destructuring-bind (dvar index cellp) (assoc env-var locals)
+         (declare (ignore dvar))
+         (assert (not cellp))
+         (let (;; List of variables to stick in the reified environment.
+               (lin (if (typep eparam 'i:ignore)
+                        (ptree-symbols ptree)
+                        (cons eparam (ptree-symbols ptree)))))
+           (asm:assemble cfunction 'o:closure 0) ; static env
+           ;; Note that we do not have to do anything special with cells here-
+           ;; since the refs will either be values or cells or what-ever anyway,
+           ;; and that's exactly what we want to put in the environment.
+           (loop for var in lin
+                 for index = (second (assoc var locals))
+                 do (asm:assemble cfunction 'o:ref index))
+           (asm:assemble cfunction 'o:make-environment
+             (asm:constant-index cfunction lin)
+             'o:set index)
+           (+ 1 (length lin))))
+       0)))
+
+
+;;; Break up an argument, which is on the stack.
+;;; Return the number of new stack slots used.
+(defun gen-ptree (cfunction ptree locals)
   (etypecase ptree
-    (null
-     (asm:assemble cfunction 'o:err-if-not-null)
-     (values nil next-local 1))
-    (symbol
-     (when cellp (asm:assemble cfunction 'o:make-cell))
-     (asm:assemble cfunction 'o:set next-local)
-     (values (list (list ptree next-local cellp)) (1+ next-local) 1))
-    (i:ignore (asm:assemble cfunction 'o:drop) (values nil next-local 1))
-    ((cons i:ignore i:ignore)
-     (asm:assemble cfunction 'o:err-if-not-cons)
-     (values nil next-local 1))
+    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
+    (symbol (let ((local (assoc ptree locals)))
+              (assert local)
+              (when (third local) (asm:assemble cfunction 'o:make-cell))
+              (asm:assemble cfunction 'o:set (second local)))
+     0)
+    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
     ((cons i:ignore t)
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
-     (multiple-value-bind (locals next-local nstack)
-         (gen-ptree cfunction (cdr ptree) next-local cellp)
-       (values locals next-local (max 2 nstack))))
+     (max 1 (gen-ptree cfunction (cdr ptree) locals)))
     ((cons t i:ignore)
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
-     (multiple-value-bind (locals next-local nstack)
-         (gen-ptree cfunction (car ptree) next-local cellp)
-       (values locals next-local (max 2 nstack))))
+     (max 1 (gen-ptree cfunction (car ptree) locals)))
     (cons
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-     (multiple-value-bind (car-locals next-local carnstack)
-         (gen-ptree cfunction (car ptree) next-local cellp)
+     (let ((carstack (gen-ptree cfunction (car ptree) locals)))
        (asm:assemble cfunction 'o:cdr)
-       (multiple-value-bind (cdr-locals next-local cdrnstack)
-           (gen-ptree cfunction (cdr ptree) next-local cellp)
-         (values (append car-locals cdr-locals)
-                 next-local
-                 (max (+ 2 carnstack) (+ 1 cdrnstack))))))))
+       (let ((cdrstack (gen-ptree cfunction (cdr ptree) locals)))
+         (max (+ 2 carstack) (+ 1 cdrstack)))))))
 
 ;;; Generate code to parse arguments to the CEP. Returns stack used.
 ;;; The CEP receives arg0 = dynenv, arg1 = car of combinand, arg2 = cadr, etc.
@@ -120,7 +148,7 @@
              (estack
                (cond (env-var
                       ;; reify
-                      (asm:assemble cfunction 'o:closure 0)
+                      (asm:assemble cfunction 'o:closure 0) ; static env
                       (loop for (sym index _) in locals
                             unless (eq sym env-var)
                               do (asm:assemble cfunction 'o:ref index)
@@ -154,29 +182,5 @@
      (gen-cep-ptree cfunction (cdr ptree) locals (1+ index)))
     (cons
      (asm:assemble cfunction 'o:arg index)
-     (+ (gen-cep-ptree-aux cfunction (car ptree) locals) 1 ; for arg
+     (+ (gen-ptree cfunction (car ptree) locals) 1 ; for arg
         (gen-cep-ptree cfunction (cdr ptree) locals (1+ index))))))
-
-;;; Break up an argument, which is on the stack.
-;;; Return the number of new stack slots used.
-(defun gen-cep-ptree-aux (cfunction ptree locals)
-  (etypecase ptree
-    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
-    (symbol (let ((local (assoc ptree locals)))
-              (assert local)
-              (when (third local) (asm:assemble cfunction 'o:make-cell))
-              (asm:assemble cfunction 'o:set (second local)))
-     0)
-    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
-    ((cons i:ignore t)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
-     (max 1 (gen-cep-ptree-aux cfunction (cdr ptree) locals)))
-    ((cons t i:ignore)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
-     (max 1 (gen-cep-ptree-aux cfunction (car ptree) locals)))
-    (cons
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-     (let ((carstack (gen-cep-ptree-aux cfunction (car ptree) locals)))
-       (asm:assemble cfunction 'o:cdr)
-       (let ((cdrstack (gen-cep-ptree-aux cfunction (cdr ptree) locals)))
-         (max (1+ carstack) cdrstack))))))

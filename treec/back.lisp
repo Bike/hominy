@@ -42,41 +42,48 @@
 
 ;;; Make and return a cfunction for the given operative node.
 (defun translate-operative (operative link-env cmodule)
-  (let* ((cf (make-instance 'asm:cfunction
-               :ptree (ptree operative) :eparam (eparam operative)
-               :cmodule cmodule))
-         (static-env-var (static-env-var operative)))
-    (asm:emit-label cf (asm:gep cf))
-    (multiple-value-bind (locals ptree-nregs ptree-nstack)
-        (gen-operative-bindings cf (ptree operative) (eparam operative)
-                                (if static-env-var (env-var operative) nil))
-      ;; Jump over the CEP to the body.
-      ;; It might be faster to choose the more common of the CEP or GEP to
-      ;; proceed into the LEP... but that's probably premature optimization.
-      (asm:assemble cf o:jump (asm:lep cf))
-      (asm:emit-label cf (asm:cep cf))
-      (let ((cep-nstack (gen-cep cf (ptree operative) (eparam operative) locals
-                                 (if static-env-var (env-var operative) nil))))
-        (asm:emit-label cf (asm:lep cf))
-        (when static-env-var
-          ;; if the environment is reified, close over the static environment.
-          ;; Note that ptree.lisp needs this to be at closure 0, hence forcing it
-          ;; to be the first closed over variable.
-          (asm:closure-index cf static-env-var))
-        (let ((*regs-hwm* ptree-nregs)
-              (*stack-hwm* (max ptree-nstack cep-nstack)))
-          (translate (body operative)
-                     (make-instance 'context
-                       :cfunction cf :link-env link-env :locals locals
-                       :nregs ptree-nregs :nstack 0))
-          (setf (asm:nlocals cf) *regs-hwm* (asm:nstack cf) *stack-hwm*)))
-      cf)))
-
-(defun linearize-ptree (ptree)
-  (etypecase ptree
-    ((or null i:ignore) nil)
-    (symbol (list ptree))
-    (cons (append (linearize-ptree (car ptree)) (linearize-ptree (cdr ptree))))))
+  (let* ((ptree (ptree operative)) (eparam (eparam operative))
+         (cf (make-instance 'asm:cfunction
+               :ptree ptree :eparam eparam :cmodule cmodule))
+         (static-env-var (static-env-var operative))
+         ;; Set (list) of variables we're binding that need to be in a cell
+         ;; because they are $set! in a closure.
+         ;; (They also need to be in a cell if the environment is reified,
+         ;;  so in that case we don't bother computing this.)
+         (enclosed-set (if static-env-var
+                           nil
+                           (intersection (ptree-symbols (cons eparam ptree))
+                                         (enclosed-sets (body operative)))))
+         (local-env-var (if static-env-var (env-var operative) nil))
+         (locals (op-bindings ptree eparam local-env-var enclosed-set))
+         ;; next register available
+         (next-index (length locals))
+         (ptree-nstack
+           (progn
+             (asm:emit-label cf (asm:gep cf))
+             (gen-operative-bindings cf ptree eparam locals local-env-var)))
+         (cep-nstack
+           (progn
+             ;; Jump over the CEP to the body.
+             ;; It might be faster to choose the more common of the CEP or GEP to
+             ;; proceed into the LEP... but that's probably premature optimization.
+             (asm:assemble cf o:jump (asm:lep cf))
+             (asm:emit-label cf (asm:cep cf))
+             (gen-cep cf ptree eparam locals local-env-var))))
+    (asm:emit-label cf (asm:lep cf))
+    (when static-env-var
+      ;; Close over the static environment if we must.
+      ;; Note that ptree.lisp needs this to be at closure 0, hence forcing it
+      ;; to be the first closed over variable.
+      (asm:closure-index cf static-env-var))
+    (let ((*regs-hwm* next-index)
+          (*stack-hwm* (max ptree-nstack cep-nstack)))
+      (translate (body operative)
+                 (make-instance 'context
+                   :cfunction cf :link-env link-env :locals locals
+                   :nregs next-index :nstack 0))
+      (setf (asm:nlocals cf) *regs-hwm* (asm:nstack cf) *stack-hwm*))
+    cf))
 
 ;;; This is separated out from the TRANSLATE on REF because it's also used by the
 ;;; translation for operative nodes.
@@ -236,55 +243,73 @@
       (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
-(defmethod translate ((node letn) orig-context)
-  (loop with context = (context orig-context :valuep t :tailp nil)
+(defmethod translate ((node letn) context)
+  (loop with vcontext = (context context :valuep t :tailp nil)
         with cf = (cfunction context)
+        with body = (body node)
+        with enclosed-set = (enclosed-sets body)
+        with index = (nregs context)
+        with inner-envv = (inner-env-var node)
         for ptree in (ptrees node)
         for valuen in (value-nodes node)
-        do (translate valuen context)
-        append (multiple-value-bind (bindings next-local nstack)
-                   (gen-ptree (cfunction context) ptree (nregs context) (inner-env-var node))
-                 (setf context (context context :new-regs (- next-local (nregs context)) ; goofy
-                                                :new-stack nstack :valuep t :tailp nil))
-                 bindings)
-          into bindings
-        finally (let* ((outer-envv (static-env-var node))
-                       (oeb (dynenv-bind node))
-                       (inner-envv (inner-env-var node))
-                       (cellp inner-envv)
-                       (outer-env-index
-                         (when (or oeb inner-envv)
-                           (or (second (assoc outer-envv (locals context)))
-                               (error "?? Reified environment ~a missing" outer-envv)))))
-                  (when oeb
-                    ;; NOTE: Since treec is simple, we know the local environment, i.e.
-                    ;; what's in outer-env-index, is never cloistered (in a cell).
-                    ;; TODO: If the OEB is never actually mutated, we could just use it
-                    ;; as an alias - like push a binding to an index that's exactly the
-                    ;; same as the outer index.
-                    (asm:assemble cf 'o:ref outer-env-index)
-                    (when cellp (asm:assemble cf 'o:make-cell))
-                    (asm:assemble cf 'o:set (nregs context))
-                    (push (list oeb (nregs context) cellp) bindings)
-                    (setf context (context context :new-regs 1 :new-stack 1)))
-                  (when inner-envv ; haveta reify
-                    (asm:assemble cf 'o:ref outer-env-index)
-                    ;; get the dynenv for reification
-                    (when oeb (asm:assemble cf 'o:ref outer-env-index))
-                    (loop for (_1 index _2) in bindings
-                          do (asm:assemble cf 'o:ref index))
-                    (asm:assemble cf 'o:make-environment
-                      (asm:constant-index cf (if oeb
-                                                 (cons oeb (mapcar #'car bindings))
-                                                 (mapcar #'car bindings)))
-                      'o:set (nregs context))
-                    ;; just to reiterate - local environments never need to be in cells.
-                    (push (list inner-envv (nregs context) nil) bindings)
-                    ;; This actually overestimates the stack by 1 if the oeb also exists. FIXME
-                    (setf context (context context :new-regs 1 :new-stack (1+ (length bindings))))))
-                (mark-regs (nregs context))
-                (mark-stack (nstack context))
-                (translate (body node)
-                           (context context :new-locals bindings
-                                            :valuep (valuep orig-context)
-                                            :tailp (tailp orig-context)))))
+        for ptree-bindings
+          = (ptree-bindings ptree index inner-envv enclosed-set)
+        nconc ptree-bindings into new-locals
+        do (incf index (length ptree-bindings))
+           (translate valuen vcontext)
+           ;; We use one stack spot for the value.
+           (setf vcontext (context vcontext :new-stack 1))
+        finally
+           ;; Now that we've computed all the values, write them into the regs.
+           ;; We do this backwards since we pushed left to right.
+           (mark-stack
+            (+ (nstack vcontext)
+               (loop for ptree in (reverse (ptrees node))
+                     for pstack = (gen-ptree cf ptree new-locals)
+                     for i from 0 ; how many of the values' stack slots we've used
+                     maximizing (- pstack i))))
+           ;; Main event. First, bind environment crap.
+           (let* ((outer-envv (static-env-var node))
+                  (oeb (dynenv-bind node))
+                  (outer-env-index
+                    (when (or oeb inner-envv)
+                      (or (second (assoc outer-envv (locals context)))
+                          (error "?? Reified environment ~a missing" outer-envv))))
+                  (estack 0))
+             (when oeb
+               ;; Bind the dynenv parameter.
+               ;; NOTE: Since treec is simple, we know the local environment, i.e.
+               ;; what's in outer-env-index, is never cloistered (in a cell).
+               ;; TODO: If the OEB is never actually mutated, we could just use it
+               ;; as an alias - like push a binding to an index that's exactly the
+               ;; same as the outer index.
+               (asm:assemble cf 'o:ref outer-env-index)
+               (let ((cellp (or inner-envv (member oeb enclosed-set))))
+                 (when cellp (asm:assemble cf 'o:make-cell))
+                 (asm:assemble cf 'o:set index)
+                 (push (list oeb index cellp) new-locals))
+               (incf index)
+               (incf estack))
+             (when inner-envv ; haveta reify
+               ;; Get the parent environment
+               (asm:assemble cf 'o:ref outer-env-index)
+               ;; Grab all the locals to put into the reified environment.
+               (loop for (var index _2) in new-locals
+                     do (asm:assemble cf 'o:ref index)
+                     collect var into vars
+                     finally (asm:assemble cf 'o:make-environment
+                               (asm:constant-index cf vars)
+                               'o:set index))
+               ;; This actually overestimates the stack by 1 if the oeb also exists.
+               ;; FIXME
+               (incf estack (1+ (length new-locals)))
+               ;; just to reiterate - local environments never need to be in cells.
+               (push (list inner-envv index nil) new-locals)
+               (incf index))
+             (mark-regs (+ (nregs context) (length new-locals)))
+             (mark-stack (+ (nstack context) estack))
+             ;; At this point the stack is where it was when the $let was entered,
+             ;; so the body context doesn't need new stack.
+             (translate (body node)
+                        (context context :new-locals new-locals
+                                 :new-regs (length new-locals))))))
