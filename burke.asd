@@ -4,7 +4,8 @@
   ((:module "interpreter"
     :depends-on ()
     :components ((:file "packages")
-                 (:file "interpret" :depends-on ("packages"))
+                 (:file "continuation" :depends-on ("packages"))
+                 (:file "interpret" :depends-on ("continuation" "packages"))
                  (:file "ptree" :depends-on ("packages"))
                  #+(or) ; needs special conspack
                  (:file "marshal" :depends-on ("interpret" "packages"))

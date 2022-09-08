@@ -171,7 +171,7 @@ If the symbol is not already bound, an error is signaled. This function never cr
         (values (aref (vvec env) pos) t)
         (values nil nil))))
 (defmethod define (new symbol (env fixed-environment))
-  (declare (ignore new))
+  (declare (cl:ignore new))
   (error "New binding for ~a cannot be added to environment ~a" symbol env))
 (defmethod map-bindings (function (env fixed-environment))
   (map nil function (names env) (vvec env)))
@@ -211,7 +211,7 @@ If the symbol is not already bound, an error is signaled. This function never cr
         (values (aref (vvec env) pos) t)
         (values nil nil))))
 (defmethod define (new symbol (env immutable-environment))
-  (declare (ignore new))
+  (declare (cl:ignore new))
   (error "New binding for ~a cannot be added to environment ~a" symbol env))
 (defmethod map-bindings (function (env immutable-environment))
   (map nil function (names env) (vvec env)))
@@ -236,21 +236,71 @@ If the symbol is not already bound, an error is signaled. This function never cr
           :vvec (map 'vector #'identity values)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; In the following, the FRAME arguments are for the parent frame.
+;;; This means evaluations in a tail context can be carried out by recursively
+;;; invoking EVAL or whatever with the same frame as EVAL or whatever received.
 
-(defgeneric eval (form env))
-(defgeneric combine (combiner combinand env))
+(defgeneric eval (form env &optional frame))
+(defgeneric combine (combiner combinand env &optional frame))
 ;;; This basically exists for the sake of the VM, which can be smarter.
-(defgeneric call (combiner env &rest combinand)
-  (:method (combiner env &rest combinand) (combine combiner combinand env)))
+(defgeneric call (combiner env frame &rest combinand)
+  (:method (combiner env frame &rest combinand)
+    (combine combiner combinand env frame)))
 
-(defmethod eval ((form symbol) env) (lookup form env))
-(defmethod eval ((form cons) env)
-  (combine (eval (car form) env) (cdr form) env))
-(defmethod eval ((form null) env) (declare (cl:ignore env)) form)
-(defmethod eval ((form t) env) (declare (cl:ignore env)) form)
+(defmethod eval ((form symbol) env &optional frame)
+  (declare (cl:ignore frame))
+  (lookup form env))
+;; Representation of the interpreter evaluating a combiner form for combination
+;; with some combinand in some end.
+(declaim (inline make-combination-frame)) ; hopefully means SBCL can DX
+(defstruct (combination-frame (:include frame)
+                              (:constructor make-combination-frame
+                                  (parent combinand env)))
+  combinand env)
+(defmethod continue ((frame combination-frame) value)
+  (continue (frame-parent frame)
+            (combine value (combination-frame-combinand frame)
+                     (combination-frame-env frame)
+                     (frame-parent frame))))
+(defmethod eval ((form cons) env &optional frame)
+  (let ((combinand (cdr form)))
+    (combine (let ((frame (make-combination-frame frame combinand env)))
+               (declare (dynamic-extent frame))
+               (eval (car form) env frame))
+             ;; use the original frame here - tail context
+             combinand env frame)))
+(defmethod eval ((form null) env &optional frame)
+  (declare (cl:ignore env frame))
+  form)
+(defmethod eval ((form t) env &optional frame)
+  (declare (cl:ignore env frame))
+  form)
 
-(defun evaluator (env) (lambda (form) (eval form env)))
-(defun evlis (forms env) (mapcar (evaluator env) forms))
+;; Representation of the interpreter partway through consing up the arguments
+;; to an applicative.
+(declaim (inline make-evlis-frame))
+(defstruct (evlis-frame (:include frame)
+                        (:constructor make-evlis-frame
+                            (parent env so-far to-go)))
+  env
+  ;; The reversed list of values previously evaluated and collected.
+  ;; Reversed so we don't need to append onto the end or any such crap.
+  so-far
+  ;; The (non-reversed) list of forms to be evaluated after this frame returns.
+  to-go)
+
+(defun evlis (forms env frame &optional vals)
+  (loop for (form . remaining-forms) on forms
+        do (let ((frame (make-evlis-frame frame env vals remaining-forms)))
+             (declare (dynamic-extent frame))
+             (push (eval form env frame) vals))
+        finally (return (nreverse vals))))
+
+(defmethod continue ((frame evlis-frame) value)
+  (continue (frame-parent frame)
+            (evlis (evlis-frame-to-go frame) (evlis-frame-env frame)
+                   (frame-parent frame) (evlis-frame-so-far frame))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -287,32 +337,40 @@ The function will receive two arguments, the dynamic environment and the combina
 (defun applicativep (object) (typep object 'applicative))
 (defun wrap (combiner) (make-instance 'applicative :underlying combiner))
 
-(defmethod combine ((combiner builtin-operative) combinand env)
-  (funcall (builtin-impl combiner) env combinand))
-(defmethod combine ((combiner derived-operative) combinand env)
+;; Operative bodies are evaluated in a tail context, so we don't need new frames
+;; for this stuff.
+(defmethod combine ((combiner builtin-operative) combinand env &optional frame)
+  (funcall (builtin-impl combiner) env frame combinand))
+(defmethod combine ((combiner derived-operative) combinand env &optional frame)
   (apply #'$sequence
          (funcall (augmenter combiner) env combinand)
+         frame
          (body combiner)))
-(defmethod combine ((combiner applicative) combinand env)
-  (combine (unwrap combiner) (evlis combinand env) env))
+;; A frame for an application (i.e. combination w/an applicative).
+;; Specifically the frame is for when the arguments have not yet been eval'd,
+;; which is how it's different from a combination-frame.
+(declaim (inline make-app-frame))
+(defstruct (app-frame (:include frame)
+                      (:constructor make-app-frame
+                          (parent combiner env)))
+  combiner env)
+(defmethod combine ((combiner applicative) combinand env &optional frame)
+  (let ((ucomb (unwrap combiner)))
+    (combine ucomb
+             (let ((frame (make-app-frame frame ucomb env)))
+               (declare (dynamic-extent frame))
+               (evlis combinand env frame))
+             env frame)))
+(defmethod continue ((frame app-frame) value)
+  (continue (frame-parent frame)
+            (combine (app-frame-combiner frame) value (app-frame-env frame)
+                     (frame-parent frame))))
 
 (defmethod print-object ((object combiner) stream)
   (print-unreadable-object (object stream :type t)
     (let ((name (name object)))
       (when name (write name :stream stream))))
   object)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Macros: A useful extension Shutt would probably detest.
-
-(defclass macro (operative)
-  ((%expander :initarg :expander :reader expander :type combiner)))
-(defun make-macro (expander) (make-instance 'macro :expander expander))
-(defmethod name ((op macro)) (name (expander op)))
-
-(defmethod combine ((combiner macro) combinand env)
-  (eval (combine (expander combiner) combinand env) env))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -339,14 +397,28 @@ The function will receive two arguments, the dynamic environment and the combina
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; Kernel defines some of these as derived, but some of these are really dang
-;;; involved that way, like $sequence, or having to derive them considerably
+;;; Kernel defines some operatives as derived, but which are really dang
+;;; involved that way, like $sequence. Or having to derive them considerably
 ;;; confuses other definitions, as with $let.
 
-(defun $sequence (env &rest forms)
-  (cond ((null forms) (make-instance 'inert))
-        ((null (rest forms)) (eval (first forms) env))
+(declaim (inline make-seq-frame))
+(defstruct (seq-frame (:include frame)
+                      (:constructor make-seq-frame (parent env to-go)))
+  env
+  ;; The list of forms still needing evaluation.
+  to-go)
+
+(defun $sequence (env frame &rest forms)
+  (cond ((null forms) inert)
+        ((null (rest forms)) (eval (first forms) env frame))
         (t (loop for (form . rest) on forms
-                 for value = (eval form env)
-                 when (null rest)
-                   return value))))
+                 if (null rest)
+                   return (eval form env frame) ; tail context
+                 else
+                   do (let ((frame (make-seq-frame frame env rest)))
+                        (declare (dynamic-extent frame))
+                        (eval form env frame))))))
+(defmethod continue ((frame seq-frame) value)
+  (continue (frame-parent frame)
+            (apply #'$sequence (seq-frame-env frame) (frame-parent frame)
+                   (seq-frame-to-go frame))))

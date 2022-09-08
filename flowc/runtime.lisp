@@ -8,7 +8,8 @@
   ((%fun :initarg :fun :reader compiled-operative-fun :type function)
    (%enclosed :initarg :enclosed :reader enclosed :accessor %enclosed)))
 
-(defmethod i:combine ((combiner compiled-operative) combinand env)
+(defmethod i:combine ((combiner compiled-operative) combinand env &optional frame)
+  (declare (ignore frame)) ; FIXME: Explicit frame handling
   (funcall (compiled-operative-fun combiner)
            (enclosed combiner) (cons combinand env)))
 
@@ -23,4 +24,4 @@
   (make-instance 'compiled-operative :fun fun :enclosed enclosed))
 
 (defun ccombine (combiner argument)
-  (combine combiner (car argument) (cdr argument)))
+  (i:combine combiner (car argument) (cdr argument)))

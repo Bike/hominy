@@ -45,7 +45,7 @@
           ((burke/type:subtypep formstype null)
            ;; ($sequence)
            (burke/ir:replace-terminator inst
-               (burke/ir:continue continuation 'inert))
+               (burke/ir:continue continuation 'i:inert))
            t)
           (t nil))))
 

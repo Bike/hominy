@@ -31,8 +31,14 @@
   (i:make-fixed-environment
    '(syms::compile)
    (list (i:wrap (i:make-builtin-operative
-                  (lambda (env combinand)
-                    (declare (ignore env))
+                  (lambda (env frame combinand)
+                    (declare (ignore env frame))
+                    ;; FIXME: Once the compiler starts doing Burke evaluations
+                    ;; (e.g. for macroexpansions), some kind of proper frame
+                    ;; will need to be established.
+                    ;; It is worth noting that Racket uses a continuation guard
+                    ;; here, so it doesn't have to worry about keeping internal
+                    ;; compiler state around for jumping back into later.
                     (destructuring-bind (combiner cenv) combinand
                       (compile combiner cenv)))
                   'syms::compile)))))

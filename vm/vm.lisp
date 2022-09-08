@@ -1,12 +1,16 @@
 (in-package #:burke/vm)
 
-(defstruct (frame (:constructor %make-frame (registers stack)))
+(declaim (inline %make-frame))
+(defstruct (frame (:include i:frame)
+                  (:constructor %make-frame (parent registers stack)))
   (registers (error "missing arg") :type simple-vector :read-only t)
   (stack (error "missing arg") :type simple-vector :read-only t)
   (sp 0 :type (and fixnum unsigned-byte)))
 
-(defun make-frame (regsize stacksize)
-  (%make-frame (make-array regsize) (make-array stacksize)))
+;;; TODO: i:continue method (will need ip)
+
+(defun make-frame (parent regsize stacksize)
+  (%make-frame parent (make-array regsize) (make-array stacksize)))
 
 (defun spush (object frame)
   (setf (aref (frame-stack frame) (frame-sp frame)) object)
@@ -159,23 +163,24 @@
              (error 'type-error :datum object :expected-type 'i:boolean)))
          (incf ip))))))
 
-(defun vm-call (code closed args start-ip)
+(defun vm-call (code closed args start-ip frame)
   (let ((module (module code))
-        (frame (make-frame (nregs code) (nstack code))))
+        (frame (make-frame frame (nregs code) (nstack code))))
+    (declare (dynamic-extent frame))
     (vm (bytecode module) frame closed (constants module) args :ip start-ip)))
 
 ;;; CODEs can be used directly as combiners iff they are not closures.
-(defmethod i:combine ((combiner code) combinand env)
+(defmethod i:combine ((combiner code) combinand env &optional frame)
   (assert (zerop (nclosed combiner)))
-  (vm-call combiner #() (list combinand env) (gep combiner)))
+  (vm-call combiner #() (list combinand env) (gep combiner) frame))
 
-(defmethod i:combine ((combiner closure) combinand env)
+(defmethod i:combine ((combiner closure) combinand env &optional frame)
   (let ((code (code combiner)))
-    (vm-call code (closed combiner) (list combinand env) (gep code))))
+    (vm-call code (closed combiner) (list combinand env) (gep code) frame)))
 
-(defmethod i:call ((combiner code) env &rest combinand)
-  (vm-call combiner #() (list* env combinand) (cep combiner)))
+(defmethod i:call ((combiner code) env frame &rest combinand)
+  (vm-call combiner #() (list* env combinand) (cep combiner) frame))
 
-(defmethod i:call ((combiner closure) env &rest combinand)
+(defmethod i:call ((combiner closure) env frame &rest combinand)
   (let ((code (code combiner)))
-    (vm-call code (closed combiner) (list* env combinand) (cep code))))
+    (vm-call code (closed combiner) (list* env combinand) (cep code) frame)))

@@ -117,49 +117,56 @@
   (define -infinity 'syms::-infinity *defining-environment*)
   (define +infinity 'syms::+infinity *defining-environment*)
   ;; TODO: Extend a bunch of this stuff for any arity.
-  (defapp number? (object) ignore (boolify (typep object '(or rational exact-infinity))))
-  (defapp finite? (object) ignore
+  (defapp number? (object) ignore ignore
+    (boolify (typep object '(or rational exact-infinity))))
+  (defapp finite? (object) ignore ignore
     (etypecase object
       (rational true)
       (exact-infinity false)))
-  (defapp integer? (object) ignore (boolify (integerp object)))
-  (defapp =? (num1 num2) ignore (=?/2 num1 num2))
-  (defapp <? (num1 num2) ignore (<?/2 num1 num2))
-  (defapp <=? (num1 num2) ignore (<=?/2 num1 num2))
-  (defapp >? (num1 num2) ignore (>?/2 num1 num2))
-  (defapp >=? (num1 num2) ignore (>=?/2 num1 num2))
-  (defapp + (n1 n2) ignore (+/2 n1 n2))
-  (defapp * (n1 n2) ignore (*/2 n1 n2))
-  (defapp - (n1 n2) ignore (-/2 n1 n2))
-  (defapp / (n1 n2) ignore (//2 n1 n2))
-  (defapp zero? (number) ignore
+  (defapp integer? (object) ignore ignore (boolify (integerp object)))
+  (defapp =? (num1 num2) ignore ignore (=?/2 num1 num2))
+  (defapp <? (num1 num2) ignore ignore (<?/2 num1 num2))
+  (defapp <=? (num1 num2) ignore ignore (<=?/2 num1 num2))
+  (defapp >? (num1 num2) ignore ignore (>?/2 num1 num2))
+  (defapp >=? (num1 num2) ignore ignore (>=?/2 num1 num2))
+  (defapp + (n1 n2) ignore ignore (+/2 n1 n2))
+  (defapp * (n1 n2) ignore ignore (*/2 n1 n2))
+  (defapp - (n1 n2) ignore ignore (-/2 n1 n2))
+  (defapp / (n1 n2) ignore ignore (//2 n1 n2))
+  (defapp zero? (number) ignore ignore
     (boolify (etypecase number (rational (zerop number)) (exact-infinity nil))))
-  (defapp positive? (number) ignore
+  (defapp positive? (number) ignore ignore
     (etypecase number
       ((rational * (0)) false)
       ((rational (0)) true)
       (-infinity false)
       (+infinity true)))
-  (defapp negative? (number) ignore
+  (defapp negative? (number) ignore ignore
     (etypecase number
       ((rational * (0)) true)
       ((rational (0)) false)
       (-infinity true)
       (+infinity false)))
-  (defapp odd? (number) ignore (boolify (etypecase number (integer (oddp number)))))
-  (defapp even? (number) ignore (boolify (etypecase number (integer (evenp number)))))
-  (defapp rational? (object) ignore (boolify (rationalp object)))
-  (defapp numerator (rational) ignore (numerator rational))
-  (defapp denominator (rational) ignore (denominator rational))
-  (defapp floor (real) ignore (etypecase real
-                                (rational (floor real))
-                                (exact-infinity real)))
-  (defapp ceiling (real) ignore (etypecase real
-                                  (rational (ceiling real))
-                                  (exact-infinity real)))
-  (defapp truncate (real) ignore (etypecase real
-                                   (rational (truncate real))
-                                   (exact-infinity real)))
-  (defapp round (real) ignore (etypecase real
-                                (rational (round real))
-                                (exact-infinity real))))
+  (defapp odd? (number) ignore ignore
+    (boolify (etypecase number (integer (oddp number)))))
+  (defapp even? (number) ignore ignore
+    (boolify (etypecase number (integer (evenp number)))))
+  (defapp rational? (object) ignore ignore (boolify (rationalp object)))
+  (defapp numerator (rational) ignore ignore (numerator rational))
+  (defapp denominator (rational) ignore ignore (denominator rational))
+  (defapp floor (real) ignore ignore
+    (etypecase real
+      (rational (floor real))
+      (exact-infinity real)))
+  (defapp ceiling (real) ignore ignore
+    (etypecase real
+      (rational (ceiling real))
+      (exact-infinity real)))
+  (defapp truncate (real) ignore ignore
+    (etypecase real
+      (rational (truncate real))
+      (exact-infinity real)))
+  (defapp round (real) ignore ignore
+    (etypecase real
+      (rational (round real))
+      (exact-infinity real))))

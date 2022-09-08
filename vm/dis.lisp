@@ -57,7 +57,7 @@
    '(burke/interpreter/syms::disassemble)
    (list (burke/interpreter:wrap
           (burke/interpreter:make-builtin-operative
-           (lambda (env combinand)
+           (lambda (env frame combinand)
              (declare (ignore env))
              (destructuring-bind (combiner) combinand
-               (disassemble combiner))))))))
+               (burke/interpreter:continue frame (disassemble combiner)))))))))

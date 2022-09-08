@@ -147,32 +147,35 @@
                        (1+ index))
                      index))
 
-(defun static-fill-values (bindings vec env)
+(defun static-fill-values (bindings vec env frame)
   (loop with index = 0
         for (static-ptree form) in bindings
-        do (setf index (bind-static-ptree-to-vector static-ptree (eval form env) vec index))))
+        for value = (eval form env frame)
+        do (setf index (bind-static-ptree-to-vector static-ptree value vec index))))
 
 (defenv *static* ()
-  (defop  $make-static-key (&optional name) ignore
+  (defop  $make-static-key (&optional name) ignore ignore
     (multiple-value-list (make-static-key name)))
-  (defapp make-static-fixed-environment (binders values &rest parents) ignore
+  (defapp make-static-fixed-environment (binders values &rest parents) ignore ignore
     (apply #'make-static-fixed-environment binders values parents))
-  (defapp static-lookup (key environment) ignore (static-lookup key environment))
+  (defapp static-lookup (key environment) ignore ignore
+    (static-lookup key environment))
   ;; convenience applicative - like static-lookup but uses the dynenv.
-  (defapp static-variable (key) dynenv (static-lookup key dynenv))
+  (defapp static-variable (key) dynenv ignore (static-lookup key dynenv))
   (defpred static-key? static-key-p)
   (defpred static-binder? static-binder-p)
   ;; Like $let, but with static binders instead of variables.
   ;; Useful for macros (where you'd bind a gensym in Lisp) despite being kind of impossible to
   ;; write in literal code.
   ;; The compiler will need to know special handling procedures for this.
-  (defop  $let-static (bindings &rest body) env
+  (defop  $let-static (bindings &rest body) env frame
+    ;; FIXME: Frames for value evaluations
     (let* ((names (static-bindings->namevec bindings))
            (values (make-array (length names)))
-           (_ (static-fill-values bindings values env))
+           (_ (static-fill-values bindings values env frame))
            (new-env (make-static-fixed-environment names values env)))
       (declare (cl:ignore _))
-      (apply #'$sequence new-env body)))
+      (apply #'$sequence new-env frame body)))
   ;; ($once-only ((a valf)*) body*)
   ;; First, evaluate body in an environment where A etc. are bound to forms that retrieve the
   ;; values of fresh static keys in the dynamic environment.
@@ -182,7 +185,8 @@
   (let (;; KLUDGE
         (static-variable (lookup 'syms::static-variable *defining-environment*))
         ($let-static (lookup 'syms::$let-static *defining-environment*)))
-    (defop  $once-only (bindings &rest body) env
+    (defop  $once-only (bindings &rest body) env ignore
+      ;; FIXME: Frames for the valf evaluations
       (let* (;; analogous to the gensym list.
              (statics
                (mapcar (lambda (bind) (multiple-value-list (make-static-key (first bind))))

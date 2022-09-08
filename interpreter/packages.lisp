@@ -6,13 +6,14 @@
 (defpackage #:burke/interpreter
   (:use #:cl)
   (:local-nicknames (#:syms #:burke/interpreter/syms))
-  (:shadow #:eval #:boolean #:variable #:ignore)
+  (:shadow #:eval #:boolean #:variable #:ignore #:throw #:continue)
   (:export #:eval #:combine #:call #:evalseq)
   (:export #:combiner #:operative #:applicative #:wrap #:unwrap
            #:make-builtin-operative #:make-derived-operative)
   (:export #:name)
   (:export #:macro #:make-macro)
   (:export #:ignore #:inert #:boolean #:true #:false)
+  (:export #:frame #:continue)
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
            #:make-fixed-environment-with-cells
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment
