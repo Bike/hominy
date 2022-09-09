@@ -45,12 +45,11 @@ Anyway, quick TODO list, in no order:
  - generic functions
   - design semantics
   - make eval/lookup/combine generic?
- - continuations
-  - escape/abort
+ - X continuations
+  - X escape/abort
   - delimited
   - guards
-  - marks?
-  - prompts?
+  - marks
  - conditions
   - syntax/operatives
   - hierarchy
@@ -107,7 +106,7 @@ Anyway, quick TODO list, in no order:
   - with wrapping
  - X inline applicatives with VM equivalents
  - X mutation
-  - inline $set!
+  - X inline $set!
  - inline $letrec
  - macroexpand
   - optimize combinations with literal operatives

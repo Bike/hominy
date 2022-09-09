@@ -94,7 +94,6 @@
            (+ 1 (length lin))))
        0)))
 
-
 ;;; Break up an argument, which is on the stack.
 ;;; Return the number of new stack slots used.
 (defun gen-ptree (cfunction ptree locals)
@@ -104,6 +103,31 @@
               (assert local)
               (when (third local) (asm:assemble cfunction 'o:make-cell))
               (asm:assemble cfunction 'o:set (second local)))
+     0)
+    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
+    ((cons i:ignore t)
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
+     (max 1 (gen-ptree cfunction (cdr ptree) locals)))
+    ((cons t i:ignore)
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
+     (max 1 (gen-ptree cfunction (car ptree) locals)))
+    (cons
+     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
+     (let ((carstack (gen-ptree cfunction (car ptree) locals)))
+       (asm:assemble cfunction 'o:cdr)
+       (let ((cdrstack (gen-ptree cfunction (cdr ptree) locals)))
+         (max (+ 2 carstack) (+ 1 cdrstack)))))))
+
+;;; Like the above, but set variables rather than bind them anew.
+(defun set-ptree (cfunction ptree locals)
+  (etypecase ptree
+    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
+    (symbol (let ((local (assoc ptree locals)))
+              (assert local)
+              (if (third local) ; cell
+                  (asm:assemble cfunction
+                    'o:ref (second local) 'o:cell-set)
+                  (asm:assemble cfunction 'o:set (second local))))
      0)
     ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
     ((cons i:ignore t)
@@ -149,12 +173,14 @@
                (cond (env-var
                       ;; reify
                       (asm:assemble cfunction 'o:closure 0) ; static env
-                      (loop for (sym index _) in locals
+                      (loop with lindex = (second (assoc env-var locals))
+                            for (sym index _) in locals
                             unless (eq sym env-var)
                               do (asm:assemble cfunction 'o:ref index)
                               and collect sym into syms
                             finally (asm:assemble cfunction 'o:make-environment
-                                      (asm:constant-index cfunction syms))
+                                      (asm:constant-index cfunction syms)
+                                      'o:set lindex)
                                     (return (1+ (length syms)))))
                      (t 0))))
         (max destack ptstack estack)))))

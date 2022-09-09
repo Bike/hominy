@@ -115,12 +115,15 @@
                   cfunction (i:lookup (link-symbol node) (link-env context))))
       (when (tailp context) (asm:assemble cfunction 'o:return)))))
 
-(defmethod translate ((node const) context)
+(defun translate-constant (value context)
   (when (valuep context)
     (mark-stack (1+ (nstack context)))
     (let ((cfunction (cfunction context)))
-      (asm:assemble cfunction 'o:const (asm:constant-index cfunction (value node)))
+      (asm:assemble cfunction 'o:const (asm:constant-index cfunction value))
       (when (tailp context) (asm:assemble cfunction 'o:return)))))
+
+(defmethod translate ((node const) context)
+  (translate-constant (value node) context))
 
 (defmethod translate ((node combination) context)
   (or (translate-primitive node context)
@@ -294,8 +297,8 @@
                ;; Get the parent environment
                (asm:assemble cf 'o:ref outer-env-index)
                ;; Grab all the locals to put into the reified environment.
-               (loop for (var index _2) in new-locals
-                     do (asm:assemble cf 'o:ref index)
+               (loop for (var vindex _2) in new-locals
+                     do (asm:assemble cf 'o:ref vindex)
                      collect var into vars
                      finally (asm:assemble cf 'o:make-environment
                                (asm:constant-index cf vars)
@@ -313,3 +316,9 @@
              (translate (body node)
                         (context context :new-locals new-locals
                                  :new-regs (length new-locals))))))
+
+(defmethod translate ((node setn) context)
+  (translate (value node) (context context :valuep t :tailp nil))
+  (mark-stack (+ (nstack context) 1 ; for the value
+                 (set-ptree (cfunction context) (ptree node) (locals context))))
+  (translate-constant i:inert context))

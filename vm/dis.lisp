@@ -58,6 +58,6 @@
    (list (burke/interpreter:wrap
           (burke/interpreter:make-builtin-operative
            (lambda (env frame combinand)
-             (declare (ignore env))
+             (declare (ignore env frame))
              (destructuring-bind (combiner) combinand
-               (burke/interpreter:continue frame (disassemble combiner)))))))))
+               (disassemble combiner))))))))

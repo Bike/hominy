@@ -73,3 +73,12 @@
               (make-instance 'letn
                 :ptrees ptrees :value-nodes valns :static-env-var envv :inner-env-var penv
                 :free really-free :body body)))))))
+
+(defmethod convert-known-operation ((name (eql 'syms::$set!))
+                                    combinern combinand envv cenv)
+  (destructuring-bind (ptree valuef) combinand
+    (make-seq
+     (list combinern)
+     (make-instance 'setn
+       :ptree ptree
+       :value (convert-form valuef envv cenv)))))

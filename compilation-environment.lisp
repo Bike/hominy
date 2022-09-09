@@ -38,7 +38,7 @@
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
                              (cons sym (bi (ko sym)))))
-                         '("$IF" "$VAU"  "$DEFINE!" "$SEQUENCE"
+                         '("$IF" "$VAU"  "$DEFINE!" "$SET!" "$SEQUENCE"
                            "$LET" "$LETREC"))
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
