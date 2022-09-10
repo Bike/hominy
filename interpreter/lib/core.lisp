@@ -42,12 +42,12 @@
     ;; FIXME: Frames for the map combinations
     (when (null lists) (error 'type-error :datum lists :expected-type 'cons))
     (loop with comb = (unwrap app)
-          for sublists = lists then (mapcar #'cdr lists)
+          for sublists = lists then (mapcar #'cdr sublists)
           for items = (mapcar #'car sublists)
-          collect (combine comb items dynenv)
           ;; FIXME: Kernel says error if the lists don't have the same length,
           ;; which is probably better.
-          until (some #'null sublists)))
+          until (some #'null sublists)
+          collect (combine comb items dynenv)))
   (defapp not? (bool) ignore ignore
     (cond ((eq bool true) false)
           ((eq bool false) true)
