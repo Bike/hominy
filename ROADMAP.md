@@ -88,14 +88,14 @@ Anyway, quick TODO list, in no order:
  - X implement
  - variable size jumps
  - variable size operands
- - explicit frame representation for continuations
- - better argument representation for applicatives?
+ - X explicit frame representation for continuations
+ - X better argument representation for applicatives?
 - assembler
  - X write
  - X forward labels
- - labels across functions
+ - X labels across functions
  - backward jumps
- - labels for entry points
+ - X labels for entry points
  - X disassembler
   - resolve labels
   - more human readable output

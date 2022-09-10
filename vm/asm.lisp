@@ -18,6 +18,8 @@
    (%ptree :initarg :ptree :initform (error "missing arg") :reader ptree)
    (%eparam :initarg :eparam :initform (error "missing arg") :reader eparam)
    (%bytecode :initform (make-array 0 :fill-pointer 0 :adjustable t) :reader bytecode)
+   ;; Currently assigned position in the module.
+   (%position :accessor cf-position :type (integer 0))
    (%annotations :initform nil :accessor annotations)
    ;; General entry point: Two args are the combinand and the dynamic environment.
    (%gep :reader gep :type label :initform (make-label))
@@ -42,6 +44,10 @@
    ;; Relative to the cfunction.
    (%position :initform nil :initarg :position :accessor annotation-position
               :type (or null (integer 0)))))
+
+(defun module-position (annotation)
+  (+ (cf-position (annotation-cfunction annotation))
+     (annotation-position annotation)))
 
 (defun annotate (cfunction annotation)
   (assert (annotation-position annotation))
@@ -111,12 +117,20 @@
   (let* ((label (label fixup))
          (cfunction (annotation-cfunction label))
          (fpos (annotation-position fixup))
-         (target (annotation-position label))
+         (pos (module-position fixup))
+         (target (module-position label))
          ;; -1 because jumps are relative to the opcode, not the label.
-         (diff (- target fpos -1)))
+         (diff (- target pos -1)))
       (if (typep diff '(signed-byte 7))
           (setf (aref (bytecode cfunction) fpos) (ldb (byte 8 0) diff))
           (error "Diff too big: ~d" diff))))
+
+;;; Assign initial module positions to the cfunctions.
+;;; With multi-byte labels, these could be shifted a little during linking.
+(defun initialize-cfunction-positions (cfunctions)
+  (loop for pos = 0 then (+ pos (length (bytecode cf)))
+        for cf in cfunctions
+        do (setf (cf-position cf) pos)))
 
 ;;; Produce a vm:module and vm:codes from cfunction and its module, by resolving any
 ;;; unresolved labels (when that's a thing), concatenating the bytecode vector, etc.
@@ -126,6 +140,7 @@
 (defun link (cfunction)
   (let* ((cmodule (cmodule cfunction))
          (cfunctions (cfunctions cmodule))
+         (_ (initialize-cfunction-positions cfunctions))
          (bytecode-length (reduce #'+ cfunctions :key (lambda (c) (length (bytecode c)))))
          (bytecode (make-array bytecode-length :element-type '(unsigned-byte 8)))
          (cconstants (constants cmodule))
@@ -142,11 +157,12 @@
                     (replace bytecode fbytecode :start1 fstart)
                  collect (make-instance 'vm:code
                            :module module
-                           :gep (annotation-position (gep cfunction))
-                           :cep (annotation-position (cep cfunction))
-                           :lep (annotation-position (lep cfunction))
+                           :gep (module-position (gep cfunction))
+                           :cep (module-position (cep cfunction))
+                           :lep (module-position (lep cfunction))
                            :end fend :nregs (nlocals cfunction) :nstack (nstack cfunction)
                            :nclosed (length (closed cfunction)) :name (name cfunction)))))
+    (declare (ignore _))
     (loop for i below nconstants
           for cconst = (aref cconstants i)
           do (setf (aref constants i)
