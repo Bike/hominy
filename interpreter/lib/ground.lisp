@@ -199,23 +199,4 @@
            (new-env (make-fixed-environment names values env)))
       (declare (cl:ignore _))
       (apply #'$sequence new-env frame body)))
-  ;; This has slightly different behavior from Kernel with respect to forms
-  ;; that immediately evaluate the newly bound names. In Kernel, doing such will
-  ;; get you the outside binding value if there is one, or else error with an
-  ;; unbound variable. (This is not stated outright but is the behavior of the
-  ;; given derivation.) This here binds everything to #inert. I think the ideal
-  ;; would be to signal an error. To do that, either there needs to be a special
-  ;; "unbound" marker to put in temporarily, or something like symbol macros.
-  ;; I'm inclined towards the latter.
-  ;; TODO: Define as a macro using mutation, for efficiency.
-  (defop  $letrec (bindings &rest body) env frame ; FIXME frames for bindings
-    (let* ((names (bindings->namesvec bindings))
-           (values (make-array (length names) :initial-element inert))
-           (new-env (make-fixed-environment names values env)))
-      (bind-ptree (mapcar #'first bindings) (mapcar #'second bindings)
-                  (lambda (name form state)
-                    (declare (cl:ignore state))
-                    (setf (lookup name new-env) (eval form new-env frame)))
-                  nil)
-      (apply #'$sequence new-env frame body)))
   (defapp exit (&rest values) ignore ignore (cl:throw 'abort values)))

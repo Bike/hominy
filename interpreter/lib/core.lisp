@@ -112,7 +112,22 @@
                      (list $let (list (first bindings))
                            (aux (rest bindings))))))
         (aux bindings))))
-  (let (($letrec (lookup 'syms::$letrec *ground*)))
+  ;; This has slightly different behavior from Kernel with respect to forms
+  ;; that immediately evaluate the newly bound names. In Kernel, doing such will
+  ;; get you the outside binding value if there is one, or else error with an
+  ;; unbound variable. (This is not stated outright but is the behavior of the
+  ;; given derivation.) This here binds everything to #inert. I think the ideal
+  ;; would be to signal an error. To do that, either there needs to be a special
+  ;; "unbound" marker to put in temporarily, or something like symbol macros.
+  (let (($let (lookup 'syms::$let *ground*))
+        ($set! (lookup 'syms::$set! *ground*))
+        (list (lookup 'syms::list *defining-environment*)))
+    (defmac $letrec (bindings &rest body) ignore ignore
+      (list* $let (mapcar (lambda (bind) (list (first bind) inert)) bindings)
+             (list $set! (mapcar #'first bindings)
+                   (list* list (mapcar #'second bindings)))
+             body)))
+  (let (($letrec (lookup 'syms::$letrec *defining-environment*)))
     (defmac $letrec* (bindings &rest body) ignore ignore
       (labels ((aux (bindings)
                  (if (null bindings)
