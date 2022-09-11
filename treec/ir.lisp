@@ -5,6 +5,11 @@
 
 (defgeneric info (node))
 
+;;; Used to apply simplifications.
+;;; Approximate (i.e. may return false even if it is)
+(defgeneric side-effect-free-p (node)
+  (:method (node) (declare (ignore node)) nil))
+
 (defclass operative (node)
   ((%ptree :initarg :ptree :reader ptree)
    (%eparam :initarg :eparam :reader eparam)
@@ -22,6 +27,7 @@
   (make-instance 'info:local-operative
     :data node
     :dynenvp (if (static-env-var node) t nil)))
+(defmethod side-effect-free-p ((node operative)) t)
 
 ;; Reference to a "global" variable, i.e. one not bound within the operative being
 ;; compiled, i.e. from its static environment.
@@ -30,6 +36,7 @@
    (%info :initarg :info :reader info :type info:info)))
 (defun make-link (symbol &optional (info (info:default-info)))
   (make-instance 'link :info info :symbol symbol))
+(defmethod side-effect-free-p ((node link)) t)
 
 (defclass ref (node)
   ((%symbol :initarg :symbol :reader ref-symbol :type symbol)
@@ -37,6 +44,7 @@
 (defun make-ref (symbol &optional (info (info:default-info)))
   ;; We could have more specific info due to e.g. local declarations.
   (make-instance 'ref :symbol symbol :info info))
+(defmethod side-effect-free-p ((node ref)) t)
 
 ;; A $set! form.
 (defclass setn (node)
@@ -49,6 +57,7 @@
   (make-instance 'const :value value))
 (defmethod info ((node const))
   (make-instance 'info:constant :value (value node)))
+(defmethod side-effect-free-p ((node const)) t)
 
 ;; A general(ly) unknown combination.
 (defclass combination (node)
@@ -67,16 +76,27 @@
   ((%elements :initarg :elements :reader elements :type list)))
 (defun make-listn (elements) (make-instance 'listn :elements elements))
 (defmethod info ((node listn)) (info:default-info)) ; TODO
+(defmethod side-effect-free-p ((node listn))
+  (every #'side-effect-free-p (elements node)))
 
 (defclass wrap (node)
   ((%combiner :initarg :combiner :reader unwrap :type node)))
+;;; Simplifying (wrap (unwrap x)) to x might be bad, in that wrap makes a
+;;; distinct object. Not sure about semantics there.
 (defun make-wrap (comb) (make-instance 'wrap :combiner comb))
 (defmethod info ((node wrap)) (info:wrap (info (unwrap node))))
+(defmethod side-effect-free-p ((node wrap))
+  (side-effect-free-p (unwrap node)))
 
 (defclass unwrap (node)
   ((%applicative :initarg :applicative :reader applicative :type node)))
-(defun make-unwrap (app) (make-instance 'unwrap :applicative app))
+(defun make-unwrap (app)
+  (if (typep app 'wrap) ; simplify
+      (unwrap app)
+      (make-instance 'unwrap :applicative app)))
 (defmethod info ((node unwrap)) (info:unwrap (info (applicative node))))
+(defmethod side-effect-free-p ((node unwrap))
+  (side-effect-free-p (applicative node)))
 
 (defclass seq (node)
   (;; A list of nodes for the forms evaluated for-effect.
@@ -86,6 +106,9 @@
 (defun make-seq (for-effect final)
   (make-instance 'seq :for-effect for-effect :final final))
 (defmethod info ((node seq)) (info (final node)))
+(defmethod side-effect-free-p ((node seq))
+  (and (every #'side-effect-free-p (for-effect node))
+       (side-effect-free-p (final node))))
 
 (defclass ifn (node)
   ((%condition :initarg :condition :reader if-cond :type node)
@@ -93,6 +116,10 @@
    (%else :initarg :else :reader else :type node)))
 (defun make-if (cond then else) (make-instance 'ifn :condition cond :then then :else else))
 (defmethod info ((node ifn)) (info:default-info)) ; TODO
+(defmethod side-effect-free-p ((node ifn))
+  (and (side-effect-free-p (if-cond node))
+       (side-effect-free-p (then node))
+       (side-effect-free-p (else node))))
 
 ;;; Used to convert $let-type bindings as well as inline operatives.
 (defclass letn (node)
@@ -111,3 +138,6 @@
    (%free :initarg :free :reader free :type list)
    (%body :initarg :body :reader body :type node)))
 (defmethod info ((node letn)) (info (body node)))
+(defmethod side-effect-free-p ((node letn))
+  (and (every #'side-effect-free-p (value-nodes node))
+       (side-effect-free-p (body node))))

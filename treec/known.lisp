@@ -20,27 +20,36 @@
 
 (defun blookup (name) (i:lookup name i:*BASE*))
 
+;;; Produce a seq node to evaluate the combiner, if we aren't sure that it's
+;;; side-effect-free.
+;;; This is important in order to for example reduce (unwrap (wrap x)) to x
+;;; which allows known-operative optimizations. It's not the best way to do it,
+;;; but as usual that will require a smarter flow-sensitive compiler.
+(defun shunt-combiner (combinern bodyn)
+  (if (side-effect-free-p combinern)
+      bodyn
+      (make-seq (list combinern) bodyn)))
+
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$if)))
                                     combinern combinand envv cenv)
   (destructuring-bind (condition then else) combinand
-    (make-if (convert-form condition envv cenv)
-             (convert-form then envv cenv)
-             (convert-form else envv cenv))))
+    (shunt-combiner
+     combinern
+     (make-if (convert-form condition envv cenv)
+              (convert-form then envv cenv)
+              (convert-form else envv cenv)))))
 
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$vau)))
                                     combinern combinand envv cenv)
-  ;; We have to include the combinern since it might have side effects.
-  ;; In the usual case that it doesn't because it's something basic like a symbol,
-  ;; the backend will compile it down to nothing.
-  (make-seq
-   (list combinern)
+  (shunt-combiner
+   combinern
    (destructuring-bind (ptree eparam . body) combinand
      (convert-operative ptree eparam body envv cenv))))
 
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$sequence)))
                                     combinern combinand envv cenv)
-  (make-seq
-   (list combinern)
+  (shunt-combiner
+   combinern
    (convert-seq combinand envv cenv)))
 
 (defmethod convert-known-application ((value
@@ -48,7 +57,7 @@
                                       combinern args envv cenv)
   (declare (ignore envv cenv))
   (if (= (length args) 1)
-      (make-seq (list combinern) (make-unwrap (first args)))
+      (shunt-combiner combinern (make-unwrap (first args)))
       nil))
 
 (defmethod convert-known-application ((value
@@ -56,14 +65,14 @@
                                       combinern args envv cenv)
   (declare (ignore envv cenv))
   (if (= (length args) 1)
-      (make-seq (list combinern) (make-wrap (first args)))
+      (shunt-combiner combinern (make-wrap (first args)))
       nil))
 
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$let)))
                                     combinern combinand envv cenv)
   (destructuring-bind (bindings . body) combinand
-    (make-seq
-     (list combinern)
+    (shunt-combiner
+     combinern
      (cond ((null bindings)
             ;; ($let () ...) = ($sequence ...), except for the new empty child environment.
             ;; I think Burke's semantics ought to allow this equivalency. In particular,
@@ -104,8 +113,8 @@
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$set!)))
                                     combinern combinand envv cenv)
   (destructuring-bind (ptree valuef) combinand
-    (make-seq
-     (list combinern)
+    (shunt-combiner
+     combinern
      (make-instance 'setn
        :ptree ptree
        :value (convert-form valuef envv cenv)))))
