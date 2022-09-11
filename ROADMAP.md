@@ -99,7 +99,7 @@ Anyway, quick TODO list, in no order:
  - backward jumps
  - X labels for entry points
  - X disassembler
-  - resolve labels
+  - X resolve labels
   - more human readable output
 - treec
  - X core operation

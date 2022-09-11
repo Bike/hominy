@@ -22,12 +22,16 @@
                     (defparameter ,(find-symbol "*OPS*" "BURKE/VM/OPS") ',map)
                     ,@(loop for (sym i) in map
                             collect `(defconstant ,sym ,i)))))))
+  ;; Format is (name instruction-length argspecs...)
+  ;; an argspec can be either CONST or JUMP, and is a hint to the disassembler
+  ;; on how to format the value. CONST means it's an index into the constants
+  ;; and JUMP means it's a relative position.
   (def (nop 0) (drop 0) (dup 0)
     (ref 1) (set 1) (closure 1) (const 1 const)
     (arg 1) (listify-args 1) (check-arg-count-= 1) (check-arg-count->= 1)
     (make-cell 0) (cell-ref 0) (cell-set 0)
     (cons 0) (list 1) (car 0) (cdr 0)
-    (return 0) (jump 1) (jump-if-true 1)
+    (return 0) (jump 1 jump) (jump-if-true 1 jump)
     (combine 0) (tail-combine 0) (lookup 0) (unwrap 0) (wrap 0)
     (enclose 1 const) (make-environment 1 const)
     (call 1) (tail-call 1)

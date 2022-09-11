@@ -4,22 +4,56 @@
   (let* ((byte (aref bytecode ip))
          (info (burke/vm:decode byte)))
     (unless info (error "Unknown opcode ~d" byte))
-    (flet ((fixed (n)
-             (prog1
-                 (cons (car info)
-                       (loop repeat n collect (aref bytecode (incf ip))))
-               (incf ip))))
-      (fixed (third info)))))
+    (cons (car info)
+          (loop for i from 0 below (third info)
+                for argspec = (nth i (cdddr info))
+                for byte = (aref bytecode (+ ip i 1))
+                collect (if (eq argspec 'o:jump) ; signed
+                            (if (logbitp 7 byte) (- byte #x100) byte)
+                            byte)))))
+
+;;; Reconstruct a list of labels from raw bytecode by looking at jump destinations.
+;;; TODO: In the future, it may be worthwhile to save annotations from the
+;;; assembler. Then we could for example give real names to labels, or use them
+;;; more easily to reconstruct compiler IR.
+(defun collect-labels (bytecode &key (start 0) (end (length bytecode)))
+  (declare (optimize debug))
+  (loop with pc = start
+        with labels = '()
+        for (name byte size . args) = (burke/vm:decode (aref bytecode pc))
+        do (loop for i from 0 below size
+                 for arg = (nth i args)
+                 for raw = (aref bytecode (+ pc i 1))
+                 when (eq arg 'o:jump) ; label
+                   do (let* (;; resolve the label (it's a signed byte, for now)
+                             (rel (if (logbitp 7 raw) (- raw #x100) raw))
+                             (abs (+ pc rel)))
+                        (unless (member abs labels) ; already got this label
+                          (push abs labels))))
+           (incf pc (1+ size))
+        until (>= pc end)
+        finally (return (loop for abs in (sort labels #'<)
+                              for i from 0
+                              collect (cons abs (format nil "L~d" i))))))
 
 (defun disassemble-bytecode (bytecode &key (start 0) (end (length bytecode))
                                         constants)
   (format t "~&---disassembly---~%")
   (loop with pc = start
+        with labels = (collect-labels bytecode :start start :end end)
         for inst-info = (burke/vm:decode (aref bytecode pc))
         for dis = (disassemble-instruction bytecode pc)
+        for lab = (assoc pc labels)
+        when lab
+          do (format t "~&~a:" (cdr lab))
         do (format t "~& ~a~{ ~d~}" (first dis) (rest dis))
-           (when (and (eq (fourth inst-info) 'o:const) constants)
-             (format t " ; ~a" (aref constants (second dis))))
+           ;; FIXME: Multiple operands
+           (case (fourth inst-info)
+             ((o:const)
+              (when constants (format t " ; ~a" (aref constants (second dis)))))
+             ((o:jump)
+              (let ((lab (assoc (+ pc (second dis)) labels)))
+                (when lab (format t " ; ~a" (cdr lab))))))
            (incf pc (1+ (third inst-info)))
         until (>= pc end)))
 
