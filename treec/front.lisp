@@ -26,6 +26,7 @@
          (env-var (make-symbol "LOCAL-ENVIRONMENT"))
          (bodyn (convert-seq body env-var cenv))
          (free (free bodyn)))
+    (format t "~&ptree ~a free ~a" ptree free)
     (multiple-value-bind (really-free static-env-var)
         (let* ((free-vars (nset-difference free (mapcar #'car bindings)))
                (env-var-free-p (member env-var free))
@@ -118,10 +119,10 @@
 
 (defmethod %convert-combination ((combineri info:known-operative) combinern combinandn env-var cenv)
   (or (and (typep combinandn 'const)
-           (convert-known-operation (info:name combineri)
+           (convert-known-operation (info:value combineri)
                                     combinern (value combinandn) env-var cenv))
       (and (typep combinandn 'listn)
-           (convert-known-application (info:name combineri)
+           (convert-known-application (info:value combineri)
                                       combinern (elements combinandn) env-var cenv))
       (call-next-method)))
 
@@ -149,7 +150,43 @@
                             (loop for form in (value combinandn)
                                   collect (convert-form form env-var cenv)))
                            env-var cenv)
-      (make-combination combinern combinandn (make-ref env-var))))
+      (call-next-method)))
+
+(defmethod %convert-combination ((combineri info:macro) combinern combinandn env-var cenv)
+  (if (typep combinandn 'const)
+      (multiple-value-bind (expansion error)
+          ;; FIXME: IGNORE-ERRORS may not be ideal
+          ;; wrt NLX within burke.
+          (ignore-errors (ctcombine (info:expander combineri)
+                                    (value combinandn)))
+        (cond (error
+               (warn "~a while macroexpanding: ~a" 'error error)
+               (call-next-method))
+              (t (convert-form expansion env-var cenv))))
+      (call-next-method)))
+
+(defmethod %convert-combination ((combineri info:constant)
+                                 combinern combinandn env-var cenv)
+  (let ((value (info:value combineri)))
+    (typecase value
+      (i:operative
+       (or (and (typep combinandn 'const)
+                (convert-known-operation value combinern (value combinandn)
+                                         env-var cenv))
+           (and (typep combinandn 'listn)
+                (convert-known-application value combinern (elements combinandn)
+                                           env-var cenv))
+           (call-next-method)))
+      (i:applicative
+       (if (typep combinandn 'const)
+           (convert-combination
+            (make-const (i:unwrap value))
+            (make-listn
+             (loop for form in (value combinandn)
+                   collect (convert-form form env-var cenv)))
+            env-var cenv)
+           (call-next-method)))
+      (t (call-next-method)))))
 
 (defun convert-combination (combinern combinandn env-var cenv)
   (%convert-combination (info combinern) combinern combinandn env-var cenv))

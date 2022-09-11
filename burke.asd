@@ -38,10 +38,11 @@
                  (:file "ir" :depends-on ("packages"))
                  (:file "free" :depends-on ("ptree" "ir"))
                  (:file "known" :depends-on ("ir"))
-                 (:file "front" :depends-on ("known" "ir" "free" "packages"))
+                 (:file "eval" :depends-on ("packages"))
+                 (:file "front" :depends-on ("eval" "known" "ir" "free" "packages"))
                  (:file "primitives" :depends-on ("front" "packages"))
                  (:file "back" :depends-on ("free" "ir" "primitives" "packages"))
-                 (:file "compile" :depends-on ("front" "back" "packages"))))
+                 (:file "compile" :depends-on ("eval" "front" "back" "packages"))))
    (:module "ir"
     :depends-on ("info" "packages")
     :components ((:file "ir")

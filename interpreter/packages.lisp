@@ -11,7 +11,7 @@
   (:export #:combiner #:operative #:applicative #:wrap #:unwrap
            #:make-builtin-operative #:make-derived-operative)
   (:export #:name)
-  (:export #:macro #:make-macro)
+  (:export #:macro #:make-macro #:expander)
   (:export #:ignore #:inert #:boolean #:true #:false)
   (:export #:frame #:continue)
   (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment

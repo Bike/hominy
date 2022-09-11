@@ -20,9 +20,10 @@
            #:join/2 #:meet/2 #:subinfop)
   (:export #:operative #:dynenvp
            #:local-operative #:data
-           #:known-operative #:name
+           #:known-operative #:value
            #:applicative #:wrap #:unwrap
-           #:constant #:value)
+           #:macro #:known-macro #:expander
+           #:constant)
   (:export #:type))
 
 (defpackage #:burke/cenv

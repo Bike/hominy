@@ -2,6 +2,7 @@
 
 (defun %compile (ptree eparam body cenvironment environment)
   (let* ((static-env-var (gensym "EXTERNAL-ENVIRONMENT"))
+         (*evaluation-env* environment)
          (op (convert-operative ptree eparam body static-env-var cenvironment))
          (cmod (make-instance 'asm:cmodule))
          (cf (translate-operative op environment cmod))
@@ -27,18 +28,13 @@
     (i:combiner combiner)))
 
 (defun module ()
-  "Return a Burke environment with bindings for the quick compiler."
+  "Return a Burke environment with bindings for the tree compiler."
   (i:make-fixed-environment
    '(syms::compile)
    (list (i:wrap (i:make-builtin-operative
                   (lambda (env frame combinand)
-                    (declare (ignore env frame))
-                    ;; FIXME: Once the compiler starts doing Burke evaluations
-                    ;; (e.g. for macroexpansions), some kind of proper frame
-                    ;; will need to be established.
-                    ;; It is worth noting that Racket uses a continuation guard
-                    ;; here, so it doesn't have to worry about keeping internal
-                    ;; compiler state around for jumping back into later.
-                    (destructuring-bind (combiner cenv) combinand
-                      (compile combiner cenv)))
+                    (declare (ignore env))
+                    (let ((*evaluation-frame* frame))
+                      (destructuring-bind (combiner cenv) combinand
+                        (compile combiner cenv))))
                   'syms::compile)))))

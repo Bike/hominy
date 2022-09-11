@@ -33,13 +33,24 @@
                      (bi (info) (make-instance 'binding :info info))
                      (ko (sym &optional (dynenvp t))
                        (make-instance 'info:known-operative
-                         :name sym :dynenvp dynenvp)))
+                         :value (i:lookup sym i:*BASE*) :dynenvp dynenvp))
+                     (km (sym)
+                       (make-instance 'info:macro
+                         :expander (i:expander (i:lookup sym i:*BASE*)))))
                 (append
+                 ;; known operatives
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
                              (cons sym (bi (ko sym)))))
                          '("$IF" "$VAU"  "$DEFINE!" "$SET!" "$SEQUENCE"
-                           "$LET" "$LETREC"))
+                           "$LET"))
+                 ;; known macros
+                 (mapcar (lambda (name)
+                           (let ((sym (sym name)))
+                             (cons sym (bi (km sym)))))
+                         '("$LAMBDA" "$COND" "$LET*" "$LETREC" "$LETREC*"
+                           "$LET/EC"))
+                 ;; known applicatives
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
                              (cons sym (bi (info:wrap (ko sym nil))))))

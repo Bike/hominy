@@ -2,26 +2,32 @@
 
 ;;; Convert an operation where the combinand is known constant.
 ;;; This is useful for basic operatives like $if, etc., that usually have constant combinands.
-(defgeneric convert-known-operation (name combiner-node combinand env-var cenv))
+(defgeneric convert-known-operation (combiner combiner-node combinand
+                                     env-var cenv))
 
 ;;; Convert an operation where the combinand is a list of known length.
 ;;; This is useful for basic applicatives.
-(defgeneric convert-known-application (name combiner-node combinand-nodes
+(defgeneric convert-known-application (combiner combiner-node combinand-nodes
                                        env-var cenv))
 
-(defmethod convert-known-operation (name combinern combinand env-var cenv)
+(defmethod convert-known-operation (combiner combinern combinand env-var cenv)
   ;; In general, give up- let convert-combination do its default.
-  (declare (ignore name combinern combinand env-var cenv))
+  (declare (ignore combiner combinern combinand env-var cenv))
+  nil)
+(defmethod convert-known-application (combiner combinern combinand env-var cenv)
+  (declare (ignore combiner combinern combinand env-var cenv))
   nil)
 
-(defmethod convert-known-operation ((name (eql 'syms::$if))
+(defun blookup (name) (i:lookup name i:*BASE*))
+
+(defmethod convert-known-operation ((value (eql (blookup 'syms::$if)))
                                     combinern combinand envv cenv)
   (destructuring-bind (condition then else) combinand
     (make-if (convert-form condition envv cenv)
              (convert-form then envv cenv)
              (convert-form else envv cenv))))
 
-(defmethod convert-known-operation ((name (eql 'syms::$vau))
+(defmethod convert-known-operation ((value (eql (blookup 'syms::$vau)))
                                     combinern combinand envv cenv)
   ;; We have to include the combinern since it might have side effects.
   ;; In the usual case that it doesn't because it's something basic like a symbol,
@@ -31,27 +37,29 @@
    (destructuring-bind (ptree eparam . body) combinand
      (convert-operative ptree eparam body envv cenv))))
 
-(defmethod convert-known-operation ((name (eql 'syms::$sequence))
+(defmethod convert-known-operation ((value (eql (blookup 'syms::$sequence)))
                                     combinern combinand envv cenv)
   (make-seq
    (list combinern)
    (convert-seq combinand envv cenv)))
 
-(defmethod convert-known-application ((name (eql 'syms::unwrap))
+(defmethod convert-known-application ((value
+                                       (eql (i:unwrap (blookup 'syms::unwrap))))
                                       combinern args envv cenv)
   (declare (ignore envv cenv))
   (if (= (length args) 1)
       (make-seq (list combinern) (make-unwrap (first args)))
       nil))
 
-(defmethod convert-known-application ((name (eql 'syms::wrap))
+(defmethod convert-known-application ((value
+                                       (eql (i:unwrap (blookup 'syms::wrap))))
                                       combinern args envv cenv)
   (declare (ignore envv cenv))
   (if (= (length args) 1)
       (make-seq (list combinern) (make-wrap (first args)))
       nil))
 
-(defmethod convert-known-operation ((name (eql 'syms::$let))
+(defmethod convert-known-operation ((value (eql (blookup 'syms::$let)))
                                     combinern combinand envv cenv)
   (destructuring-bind (bindings . body) combinand
     (make-seq
@@ -93,7 +101,7 @@
                 :ptrees ptrees :value-nodes valns :static-env-var envv :inner-env-var penv
                 :free really-free :body body)))))))
 
-(defmethod convert-known-operation ((name (eql 'syms::$set!))
+(defmethod convert-known-operation ((value (eql (blookup 'syms::$set!)))
                                     combinern combinand envv cenv)
   (destructuring-bind (ptree valuef) combinand
     (make-seq

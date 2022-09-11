@@ -39,14 +39,24 @@
   (;; Could be e.g. a cfunction, or other IR for the operative.
    (%data :initarg :data :reader data)))
 
-;;; Note that we use names instead of directly some handler function etc here
+;;; Note that we use values instead of directly some handler function etc here
 ;;; because these infos are used in different compilers, so we need a little
 ;;; bit of indirection.
 (defclass known-operative (operative)
-  ((%name :initarg :name :reader name)))
+  ((%value :initarg :value :reader value)))
 
 (defclass applicative (info)
   ((%underlying :initarg :underlying :reader unwrap)))
+
+;;; MACRO kind of overlaps with CONSTANT. But for the time being it makes things
+;;; easier in the compiler to keep it distinct. It's a bit like a constant, but
+;;; also implies that the compiler is allowed to macroexpand.
+(defclass macro (info)
+  ((%expander :initarg :expander :reader expander)))
+
+;;; KO goes first in the CPL so that the compiler can try any special tricks
+;;; before resorting to macroexpansion.
+(defclass known-macro (known-operative macro) ())
 
 (defun wrap (info)
   (make-instance 'applicative :underlying info))

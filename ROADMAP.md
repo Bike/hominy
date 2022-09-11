@@ -111,8 +111,8 @@ Anyway, quick TODO list, in no order:
   - X inline $set!
  - inline $let
  - multiple value optimization: don't heap-cons for e.g. ($set! (a b) (list c d))
- - macroexpand
-  - optimize combinations with literal operatives
+ - X macroexpand
+  - X optimize combinations with literal operatives
  - direct calls
  - real tail calls
 - flowc
