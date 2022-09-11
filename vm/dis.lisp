@@ -11,24 +11,32 @@
                (incf ip))))
       (fixed (third info)))))
 
-(defun disassemble-bytecode (bytecode &key (start 0) (end (length bytecode)))
+(defun disassemble-bytecode (bytecode &key (start 0) (end (length bytecode))
+                                        constants)
+  (format t "~&---disassembly---~%")
   (loop with pc = start
         for inst-info = (burke/vm:decode (aref bytecode pc))
-        collect (disassemble-instruction bytecode pc)
-        do (incf pc (1+ (third inst-info)))
+        for dis = (disassemble-instruction bytecode pc)
+        do (format t "~& ~a~{ ~d~}" (first dis) (rest dis))
+           (when (and (eq (first inst-info) 'o:const) constants)
+             (format t " ; ~a" (aref constants (second dis))))
+           (incf pc (1+ (third inst-info)))
         until (>= pc end)))
 
 (defgeneric disassemble (object))
 
 (defmethod disassemble ((obj vm:module))
-  (disassemble-bytecode (burke/vm:bytecode obj)))
+  (disassemble-bytecode (burke/vm:bytecode obj)
+                        :constants (burke/vm:constants obj)))
 
 (defmethod disassemble ((obj vm:closure)) (disassemble (vm:code obj)))
 
 (defmethod disassemble ((obj vm:code))
-  (disassemble-bytecode (burke/vm:bytecode (burke/vm:module obj))
-                        :start (vm:gep obj)
-                        :end (vm:end obj)))
+  (let ((mod (burke/vm:module obj)))
+    (disassemble-bytecode (burke/vm:bytecode mod)
+                          :constants (burke/vm:constants mod)
+                          :start (vm:gep obj)
+                          :end (vm:end obj))))
 
 (defmethod disassemble ((obj burke/interpreter:applicative))
   (disassemble (burke/interpreter:unwrap obj)))
@@ -41,4 +49,5 @@
            (lambda (env frame combinand)
              (declare (ignore env frame))
              (destructuring-bind (combiner) combinand
-               (disassemble combiner))))))))
+               (disassemble combiner)
+               burke/interpreter:inert)))))))
