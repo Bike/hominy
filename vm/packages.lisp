@@ -2,6 +2,7 @@
   (:use #:cl)
   (:local-nicknames (#:i #:burke/interpreter)
                     (#:o #:burke/vm/ops))
+  (:export #:decode #:instruction-length)
   (:export #:module #:bytecode #:code #:closure #:enclose)
   ;; needed for disassemble
   (:export #:gep #:end))

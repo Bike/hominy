@@ -1,5 +1,11 @@
 (in-package #:burke/vm)
 
+(defun decode (byte)
+  (first (member byte o:*ops* :key #'second)))
+
+(defun instruction-length (mnemonic)
+  (third (assoc mnemonic o:*ops*)))
+
 (declaim (inline %make-frame))
 (defstruct (frame (:include i:frame)
                   (:constructor %make-frame (parent registers stack)))
