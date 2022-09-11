@@ -90,6 +90,8 @@ Anyway, quick TODO list, in no order:
  - variable size operands
  - X explicit frame representation for continuations
  - X better argument representation for applicatives?
+ - "lower level" - e.g. types, allocations
+  - and calls instead of runtime things like unwrap, combine
 - assembler
  - X write
  - X forward labels
