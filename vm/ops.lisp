@@ -27,7 +27,7 @@
   ;; on how to format the value. CONST means it's an index into the constants
   ;; and JUMP means it's a relative position.
   (def (nop 0) (drop 0) (dup 0)
-    (ref 1) (set 1) (closure 1) (const 1 const)
+    (ref 1) (set 1) (closure 1 closure) (const 1 const)
     (arg 1) (listify-args 1) (check-arg-count-= 1) (check-arg-count->= 1)
     (make-cell 0) (cell-ref 0) (cell-set 0)
     (cons 0) (list 1) (car 0) (cdr 0)

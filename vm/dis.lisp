@@ -37,7 +37,7 @@
                               collect (cons abs (format nil "L~d" i))))))
 
 (defun disassemble-bytecode (bytecode &key (start 0) (end (length bytecode))
-                                        constants)
+                                        constants closed)
   (format t "~&---disassembly---~%")
   (loop with pc = start
         with labels = (collect-labels bytecode :start start :end end)
@@ -53,13 +53,17 @@
               (when constants (format t " ; ~a" (aref constants (second dis)))))
              ((o:jump)
               (let ((lab (assoc (+ pc (second dis)) labels)))
-                (when lab (format t " ; ~a" (cdr lab))))))
+                (when lab (format t " ; ~a" (cdr lab)))))
+             ((o:closure)
+              (when closed (format t " ; ~a" (aref closed (second dis))))))
            (incf pc (1+ (third inst-info)))
         until (>= pc end)))
 
 (defgeneric disassemble (object))
 
 (defmethod disassemble ((obj vm:module))
+  ;; TODO: Print closure variables from each function individually.
+  ;; (And, really, break up the disassembly into functions.)
   (disassemble-bytecode (burke/vm:bytecode obj)
                         :constants (burke/vm:constants obj)))
 
@@ -69,6 +73,7 @@
   (let ((mod (burke/vm:module obj)))
     (disassemble-bytecode (burke/vm:bytecode mod)
                           :constants (burke/vm:constants mod)
+                          :closed (burke/vm:closed obj)
                           :start (vm:gep obj)
                           :end (vm:end obj))))
 

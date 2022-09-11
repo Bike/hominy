@@ -3,7 +3,8 @@
   (:local-nicknames (#:i #:burke/interpreter)
                     (#:o #:burke/vm/ops))
   (:export #:decode #:instruction-length)
-  (:export #:module #:bytecode #:constants #:code #:closure #:enclose)
+  (:export #:module #:bytecode #:constants
+           #:code #:closure #:enclose #:closed)
   ;; needed for disassemble
   (:export #:gep #:end))
 

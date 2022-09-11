@@ -161,7 +161,7 @@
                            :cep (module-position (cep cfunction))
                            :lep (module-position (lep cfunction))
                            :end fend :nregs (nlocals cfunction) :nstack (nstack cfunction)
-                           :nclosed (length (closed cfunction)) :name (name cfunction)))))
+                           :closed (closed cfunction) :name (name cfunction)))))
     (declare (ignore _))
     (loop for i below nconstants
           for cconst = (aref cconstants i)

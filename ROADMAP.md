@@ -100,7 +100,7 @@ Anyway, quick TODO list, in no order:
  - X labels for entry points
  - X disassembler
   - X resolve labels
-  - more human readable output
+  - X more human readable output
 - treec
  - X core operation
  - X basic operatives

@@ -54,10 +54,14 @@
    (%nregs :initarg :nregs :reader nregs :type (and unsigned-byte fixnum))
    ;; ...and the stack.
    (%nstack :initarg :nstack :reader nstack :type (and unsigned-byte fixnum))
-   ;; How many slots does a closure need?
-   (%nclosed :initarg :nclosed :reader nclosed :type (and unsigned-byte fixnum))
+   ;; A vector of symbols naming closed over variables.
+   ;; At runtime, this is only used to determine the length of the closure,
+   ;; but the disassembler can use it to print CLOSURE instructions nicely.
+   (%closed :initarg :closed :reader closed :type simple-vector)
    ;; Human-readable (but symbolic) name for debugging.
    (%name :initform nil :initarg :name :reader i:name)))
+
+(defun nclosed (code) (length (closed code)))
 
 (defclass closure (i:operative)
   ((%code :initarg :code :reader code)
