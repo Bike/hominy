@@ -145,12 +145,11 @@
          (incf ip))
         ((#.o:call)
          (let ((args (gather (next-code))) (combiner (spop)))
-           (spush (apply #'i:call combiner args)))
+           (spush (apply #'i:call combiner frame args)))
          (incf ip))
         ((#.o:tail-call)
          (let ((args (gather (next-code))) (combiner (spop)))
-           (return-from vm (apply #'i:call combiner args))))
-        ;; call, tail-call
+           (return-from vm (apply #'i:call combiner frame args))))
         ((#.o:err-if-not-cons)
          (let ((object (spop)))
            (unless (consp object) (error 'type-error :datum object :expected-type 'cons)))
@@ -180,9 +179,9 @@
   (let ((code (code combiner)))
     (vm-call code (closed combiner) (list combinand env) (gep code) frame)))
 
-(defmethod i:call ((combiner code) env frame &rest combinand)
+(defmethod i:call ((combiner code) frame env &rest combinand)
   (vm-call combiner #() (list* env combinand) (cep combiner) frame))
 
-(defmethod i:call ((combiner closure) env frame &rest combinand)
+(defmethod i:call ((combiner closure) frame env &rest combinand)
   (let ((code (code combiner)))
     (vm-call code (closed combiner) (list* env combinand) (cep code) frame)))

@@ -244,7 +244,7 @@ If the symbol is not already bound, an error is signaled. This function never cr
 (defgeneric eval (form env &optional frame))
 (defgeneric combine (combiner combinand env &optional frame))
 ;;; This basically exists for the sake of the VM, which can be smarter.
-(defgeneric call (combiner env frame &rest combinand)
+(defgeneric call (combiner frame env &rest combinand)
   (:method (combiner env frame &rest combinand)
     (combine combiner combinand env frame)))
 
