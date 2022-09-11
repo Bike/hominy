@@ -23,13 +23,13 @@
 (defun convert-operative (ptree eparam body static-env-var cenv)
   (let* ((bindings (operative-bindings ptree eparam))
          (cenv (cenv:augment1 cenv bindings))
-         (env-var (make-symbol "LOCAL-ENVIRONMENT"))
+         (env-var (make-symbol (format nil "LOCAL-ENVIRONMENT ~s ~a"
+                                       ptree eparam)))
          (bodyn (convert-seq body env-var cenv))
          (free (free bodyn)))
-    (format t "~&ptree ~a free ~a" ptree free)
     (multiple-value-bind (really-free static-env-var)
-        (let* ((free-vars (nset-difference free (mapcar #'car bindings)))
-               (env-var-free-p (member env-var free))
+        (let* ((env-var-free-p (member env-var free))
+               (free-vars (nset-difference free (mapcar #'car bindings)))
                (really-free (if env-var-free-p
                                 (list* static-env-var (delete env-var free-vars))
                                 free-vars)))
