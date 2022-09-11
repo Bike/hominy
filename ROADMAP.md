@@ -83,6 +83,9 @@ Anyway, quick TODO list, in no order:
  - implement
  - integrate with generic functions
  - integrate with compilation environment?
+- niceties
+ - better error messages for ptree mismatch
+ - better combiner names
 - VM
  - X basic design
  - X implement
