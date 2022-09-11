@@ -132,15 +132,15 @@
     ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
     ((cons i:ignore t)
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
-     (max 1 (gen-ptree cfunction (cdr ptree) locals)))
+     (max 1 (set-ptree cfunction (cdr ptree) locals)))
     ((cons t i:ignore)
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
-     (max 1 (gen-ptree cfunction (car ptree) locals)))
+     (max 1 (set-ptree cfunction (car ptree) locals)))
     (cons
      (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-     (let ((carstack (gen-ptree cfunction (car ptree) locals)))
+     (let ((carstack (set-ptree cfunction (car ptree) locals)))
        (asm:assemble cfunction 'o:cdr)
-       (let ((cdrstack (gen-ptree cfunction (cdr ptree) locals)))
+       (let ((cdrstack (set-ptree cfunction (cdr ptree) locals)))
          (max (+ 2 carstack) (+ 1 cdrstack)))))))
 
 ;;; Generate code to parse arguments to the CEP. Returns stack used.

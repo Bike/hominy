@@ -114,7 +114,7 @@
          (incf ip))
         ((#.o:make-cell) (spush (i:make-cell (spop))) (incf ip))
         ((#.o:cell-ref) (spush (i:cell-value (spop))) (incf ip))
-        ((#.o:cell-set) (let ((val (spop))) (setf (i:cell-value (spop)) val))
+        ((#.o:cell-set) (setf (i:cell-value (spop)) (spop))
          (incf ip))
         ((#.o:cons) (let ((cdr (spop))) (spush (cons (spop) cdr))) (incf ip))
         ((#.o:list) (spush (gather (next-code))) (incf ip))
