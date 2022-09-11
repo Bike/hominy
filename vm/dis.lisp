@@ -18,7 +18,7 @@
         for inst-info = (burke/vm:decode (aref bytecode pc))
         for dis = (disassemble-instruction bytecode pc)
         do (format t "~& ~a~{ ~d~}" (first dis) (rest dis))
-           (when (and (eq (first inst-info) 'o:const) constants)
+           (when (and (eq (fourth inst-info) 'o:const) constants)
              (format t " ; ~a" (aref constants (second dis))))
            (incf pc (1+ (third inst-info)))
         until (>= pc end)))
