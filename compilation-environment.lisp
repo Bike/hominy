@@ -34,6 +34,11 @@
                      (ko (sym &optional (dynenvp t))
                        (make-instance 'info:known-operative
                          :value (i:lookup sym i:*BASE*) :dynenvp dynenvp))
+                     (ka (sym &optional (dynenvp t))
+                       (info:wrap
+                        (make-instance 'info:known-operative
+                          :value (i:unwrap (i:lookup sym i:*BASE*))
+                          :dynenvp dynenvp)))
                      (km (sym)
                        (make-instance 'info:macro
                          :expander (i:expander (i:lookup sym i:*BASE*)))))
@@ -53,12 +58,12 @@
                  ;; known applicatives
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
-                             (cons sym (bi (info:wrap (ko sym nil))))))
+                             (cons sym (bi (ka sym nil)))))
                          '("EVAL" "COMBINE" "LOOKUP"
                            "ENVIRONMENT?" "MAKE-ENVIRONMENT"
                            "MAKE-FIXED-ENVIRONMENT"
                            "OPERATIVE?" "APPLICATIVE?"
-                           "WRAP" "UNWRAP" "CONS" "CAR" "CDR" "CONS?"
+                           "WRAP" "UNWRAP" "CONS" "CAR" "CDR" "CONS?" "LIST"
                            "NULL?" "SYMBOL?" "EQ?" "BOOLEAN?" "EXIT"))))))
 
 ;;; Do a simple augmentation - complete, only one parent.

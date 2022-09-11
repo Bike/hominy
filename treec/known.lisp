@@ -68,6 +68,12 @@
       (shunt-combiner combinern (make-wrap (first args)))
       nil))
 
+(defmethod convert-known-application ((value
+                                       (eql (i:unwrap (blookup 'syms::list))))
+                                      combinern args envv cenv)
+  (declare (ignore envv cenv))
+  (shunt-combiner combinern (make-listn args)))
+
 (defmethod convert-known-operation ((value (eql (blookup 'syms::$let)))
                                     combinern combinand envv cenv)
   (destructuring-bind (bindings . body) combinand
