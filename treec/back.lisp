@@ -247,10 +247,18 @@
     (let* ((cf (cfunction context))
            (opcf (translate-operative node (link-env context) (asm:cmodule cf)))
            (free (free node)))
-      (mark-stack (+ (length free) (nstack context)))
-      (loop for var in free
-            do (symbol-binding var context))
-      (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))
+      (cond ((zerop (length free))
+             ;; The operative doesn't actually close over anything, so it can
+             ;; simply be a constant.
+             ;; asm:link will (eventually) replace the cfunction with the actual
+             ;; code in the constant vector.
+             (mark-stack (+ 1 (nstack context)))
+             (asm:assemble cf 'o:const (asm:constant-index cf opcf)))
+            (t
+             (mark-stack (+ (length free) (nstack context)))
+             (loop for var in free
+                   do (symbol-binding var context))
+             (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))))
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
 (defmethod translate ((node letn) context)
