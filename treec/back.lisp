@@ -219,6 +219,13 @@
       (asm:assemble cf 'o:unwrap)
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
+(defmethod translate ((node wrap) context)
+  (when (valuep context)
+    (let ((cf (cfunction context)))
+      (translate (unwrap node) (context context :valuep t :tailp nil))
+      (asm:assemble cf 'o:wrap)
+      (when (tailp context) (asm:assemble cf 'o:return)))))
+
 (defmethod translate ((node ifn) context)
   (let* ((cf (cfunction context))
          (thenl (asm:make-label))

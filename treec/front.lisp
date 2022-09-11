@@ -36,7 +36,7 @@
       (make-instance 'operative
         :ptree ptree :eparam eparam
         :free really-free :static-env-var static-env-var :env-var env-var
-        :body (convert-seq body env-var cenv)))))
+        :body bodyn))))
 
 (defun convert-seq (forms env-var cenv)
   (cond ((null forms) (convert-constant i:inert env-var cenv))
@@ -120,6 +120,9 @@
   (or (and (typep combinandn 'const)
            (convert-known-operation (info:name combineri)
                                     combinern (value combinandn) env-var cenv))
+      (and (typep combinandn 'listn)
+           (convert-known-application (info:name combineri)
+                                      combinern (elements combinandn) env-var cenv))
       (call-next-method)))
 
 (defmethod %convert-combination ((combineri info:local-operative) combinern combinandn env-var cenv)

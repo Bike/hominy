@@ -68,6 +68,11 @@
 (defun make-listn (elements) (make-instance 'listn :elements elements))
 (defmethod info ((node listn)) (info:default-info)) ; TODO
 
+(defclass wrap (node)
+  ((%combiner :initarg :combiner :reader unwrap :type node)))
+(defun make-wrap (comb) (make-instance 'wrap :combiner comb))
+(defmethod info ((node wrap)) (info:wrap (info (unwrap node))))
+
 (defclass unwrap (node)
   ((%applicative :initarg :applicative :reader applicative :type node)))
 (defun make-unwrap (app) (make-instance 'unwrap :applicative app))

@@ -134,6 +134,7 @@
          (let ((env (spop)) (sym (spop))) (spush (i:lookup sym env)))
          (incf ip))
         ((#.o:unwrap) (spush (i:unwrap (spop))) (incf ip))
+        ((#.o:wrap) (spush (i:wrap (spop))) (incf ip))
         ((#.o:enclose)
          (let ((code (constant (next-code))))
            (spush (enclose code (gather (nclosed code)))))

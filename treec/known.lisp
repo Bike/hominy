@@ -4,6 +4,11 @@
 ;;; This is useful for basic operatives like $if, etc., that usually have constant combinands.
 (defgeneric convert-known-operation (name combiner-node combinand env-var cenv))
 
+;;; Convert an operation where the combinand is a list of known length.
+;;; This is useful for basic applicatives.
+(defgeneric convert-known-application (name combiner-node combinand-nodes
+                                       env-var cenv))
+
 (defmethod convert-known-operation (name combinern combinand env-var cenv)
   ;; In general, give up- let convert-combination do its default.
   (declare (ignore name combinern combinand env-var cenv))
@@ -31,6 +36,20 @@
   (make-seq
    (list combinern)
    (convert-seq combinand envv cenv)))
+
+(defmethod convert-known-application ((name (eql 'syms::unwrap))
+                                      combinern args envv cenv)
+  (declare (ignore envv cenv))
+  (if (= (length args) 1)
+      (make-seq (list combinern) (make-unwrap (first args)))
+      nil))
+
+(defmethod convert-known-application ((name (eql 'syms::wrap))
+                                      combinern args envv cenv)
+  (declare (ignore envv cenv))
+  (if (= (length args) 1)
+      (make-seq (list combinern) (make-wrap (first args)))
+      nil))
 
 (defmethod convert-known-operation ((name (eql 'syms::$let))
                                     combinern combinand envv cenv)

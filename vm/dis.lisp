@@ -3,7 +3,7 @@
 (defun instruction-length (op)
   (ecase op
     ((o:nop o:drop o:dup o:make-cell o:cell-ref o:cell-set o:cons o:car o:cdr o:return
-            o:combine o:tail-combine o:lookup o:unwrap
+            o:combine o:tail-combine o:lookup o:unwrap o:wrap
             o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
      1)
     ((o:ref o:set o:closure o:const o:arg o:listify-args
@@ -22,7 +22,7 @@
                (incf ip))))
       (ecase (car pair)
         ((o:nop o:drop o:dup o:make-cell o:cell-ref o:cell-set o:cons o:car o:cdr o:return
-                o:combine o:tail-combine o:lookup o:unwrap
+                o:combine o:tail-combine o:lookup o:unwrap o:wrap
                 o:err-if-not-cons o:err-if-not-null o:err-if-not-bool)
          (fixed 0))
         ((o:ref o:set o:closure o:const o:arg o:listify-args o:list o:jump o:jump-if-true

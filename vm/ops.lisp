@@ -24,6 +24,6 @@
     make-cell cell-ref cell-set
     cons list car cdr
     return jump jump-if-true
-    combine tail-combine lookup unwrap enclose make-environment
+    combine tail-combine lookup unwrap wrap enclose make-environment
     call tail-call
     err-if-not-cons err-if-not-null err-if-not-bool))
