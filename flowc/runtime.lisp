@@ -13,6 +13,12 @@
   (funcall (compiled-operative-fun combiner)
            (enclosed combiner) (cons combinand env)))
 
+(defun ptree-names (ptree)
+  (etypecase ptree
+    ((or null i:ignore) ())
+    (symbol (list ptree))
+    (cons (append (ptree-names (car ptree)) (ptree-names (cdr ptree))))))
+
 (defun caugment1 (env) (i:make-uninitialized-fixed-environment (list env)))
 (defun caugment2 (env ptree object)
   (let* ((names (coerce (ptree-names ptree) 'vector))

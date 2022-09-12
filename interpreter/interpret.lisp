@@ -191,9 +191,9 @@ If the symbol is not already bound, an error is signaled. This function never cr
     :vvec (map 'vector #'identity cells)))
 
 ;;; Two stage augment, used in the runtime.
-(defun %augment1 (env)
+(defun make-uninitialized-fixed-environment (env)
   (make-instance 'fixed-environment :parents (list env)))
-(defun %augment2 (env names values)
+(defun initialize-fixed-environment (env names values)
   (setf (%names env) (map 'vector #'identity names)
         (%vvec env) (map 'vector #'make-cell values))
   env)
