@@ -47,13 +47,13 @@
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
                              (cons sym (bi (ko sym)))))
-                         '("$IF" "$VAU"  "$DEFINE!" "$SET!" "$SEQUENCE"
-                           "$LET"))
+                         '("$IF" "$VAU"  "$DEFINE!" "$SET!" "$SEQUENCE"))
                  ;; known macros
                  (mapcar (lambda (name)
                            (let ((sym (sym name)))
                              (cons sym (bi (km sym)))))
-                         '("$LAMBDA" "$COND" "$LET*" "$LETREC" "$LETREC*"
+                         '("$LAMBDA" "$COND" 
+                           "$LET" "$LET*" "$LETREC" "$LETREC*"
                            "$LET/EC"))
                  ;; known applicatives
                  (mapcar (lambda (name)

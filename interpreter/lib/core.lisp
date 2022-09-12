@@ -104,7 +104,11 @@
   (defapp memq? (object list) ignore ignore (boolify (member object list)))
   (defop  $binds? (env sym) dynenv ignore (boolify (binds? sym (eval env dynenv))))
   (defapp get-current-environment () env ignore env)
-  (let (($let (lookup 'syms::$let *ground*)))
+  (let (($lambda (lookup 'syms::$lambda *defining-environment*)))
+    (defmac $let (bindings &rest body) ignore ignore
+      (list* (list* $lambda (mapcar #'first bindings) body)
+             (mapcar #'second bindings))))
+  (let (($let (lookup 'syms::$let *defining-environment*)))
     (defmac $let* (bindings &rest body) ignore ignore
       (labels ((aux (bindings)
                  (if (null bindings)
@@ -119,7 +123,7 @@
   ;; given derivation.) This here binds everything to #inert. I think the ideal
   ;; would be to signal an error. To do that, either there needs to be a special
   ;; "unbound" marker to put in temporarily, or something like symbol macros.
-  (let (($let (lookup 'syms::$let *ground*))
+  (let (($let (lookup 'syms::$let *defining-environment*))
         ($set! (lookup 'syms::$set! *ground*))
         (list (lookup 'syms::list *defining-environment*)))
     (defmac $letrec (bindings &rest body) ignore ignore
@@ -153,7 +157,7 @@
   ;; FIXME: In the final version ought to use static keys, not a gensym.
   (let (($catch (lookup 'syms::$catch *ground*))
         ($make-catch-tag (lookup 'syms::$make-catch-tag *ground*))
-        ($let (lookup 'syms::$let *ground*)))
+        ($let (lookup 'syms::$let *defining-environment*)))
     (defmac $let/ec (block-name &rest body) ignore ignore
       (let ((csym (gensym "CATCH")))
         #+(or)

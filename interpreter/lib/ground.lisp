@@ -1,14 +1,5 @@
 (in-package #:burke/interpreter)
 
-(defun bindings->namesvec (bindings)
-  (coerce (loop for (ptree) in bindings nconc (ptree-names ptree)) 'vector))
-
-(defun fill-values (bindings vec env frame)
-  (loop with start = 0
-        for (ptree form) in bindings
-        for value = (eval form env frame)
-        do (setf start (bind-ptree-to-vector ptree value vec start))))
-
 ;;; Returns a function that, given a combinand passed
 ;;; to an operative, returns a new augmentation of static-env with everything
 ;;; in the ptree and eparam bound. It sort of pre "compiles" a ptree.
@@ -188,15 +179,5 @@
   ;; continuation parameter, which is the current continuation
   ;; by default.
   (defapp tag-available? (tag) ignore frame
-    (continue frame (boolify (tag-available-p tag frame))))
-  ;; environment stuff
-  (defop  $let (bindings &rest body) env frame
-    ;; FIXME: Frames for the value evaluations.
-    ;; (Alternately, skip that by just macroexpanding to an application?)
-    (let* ((names (bindings->namesvec bindings))
-           (values (make-array (length names)))
-           (_ (fill-values bindings values env frame))
-           (new-env (make-fixed-environment names values env)))
-      (declare (cl:ignore _))
-      (apply #'$sequence new-env frame body)))
+    (boolify (tag-available-p tag frame)))
   (defapp exit (&rest values) ignore ignore (cl:throw 'abort values)))
