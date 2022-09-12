@@ -92,7 +92,10 @@
         for item in items
         do (etypecase item
              (symbol ; treat as an instruction name
-              (vector-push-extend (symbol-value item) bytecode))
+              (let ((opcode (and (boundp item) (symbol-value item))))
+                (if (typep opcode '(unsigned-byte 8))
+                    (vector-push-extend opcode bytecode)
+                    (error "Not a valid thing to assemble: ~s" item))))
              (label
               ;; We're referencing a label, so insert a 0, and record a fixup.
               (annotate cfunction
