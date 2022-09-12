@@ -121,6 +121,7 @@
 ;;; Like the above, but set variables rather than bind them anew.
 (defun set-ptree (cfunction ptree locals)
   (etypecase ptree
+    (i:ignore (asm:assemble cfunction 'o:drop) 0)
     (null (asm:assemble cfunction 'o:err-if-not-null) 0)
     (symbol (let ((local (assoc ptree locals)))
               (assert local)
