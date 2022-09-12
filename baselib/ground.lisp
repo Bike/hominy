@@ -1,12 +1,41 @@
-(in-package #:burke/interpreter)
+(in-package #:burke/baselib)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Kernel defines some operatives as derived, but which are really dang
+;;; involved that way, like $sequence. Or having to derive them considerably
+;;; confuses other definitions, as with $let.
+
+(declaim (inline make-seq-frame))
+(defstruct (seq-frame (:include i:frame)
+                      (:constructor make-seq-frame (parent env to-go)))
+  env
+  ;; The list of forms still needing evaluation.
+  to-go)
+
+(defun $sequence (env frame &rest forms)
+  (cond ((null forms) i:inert)
+        ((null (rest forms)) (i:eval (first forms) env frame))
+        (t (loop for (form . rest) on forms
+                 if (null rest)
+                   return (i:eval form env frame) ; tail context
+                 else
+                   do (let ((frame (make-seq-frame frame env rest)))
+                        (declare (dynamic-extent frame))
+                        (i:eval form env frame))))))
+(defmethod i:continue ((frame seq-frame) value)
+  (i:continue (i:frame-parent frame)
+              (apply #'$sequence (seq-frame-env frame) (i:frame-parent frame)
+                     (seq-frame-to-go frame))))
+
 
 ;;; Returns a function that, given a combinand passed
 ;;; to an operative, returns a new augmentation of static-env with everything
 ;;; in the ptree and eparam bound. It sort of pre "compiles" a ptree.
 (defun make-augmenter (static-env ptree eparam)
   (etypecase eparam
-    (ignore
-     (multiple-value-bind (names augmenter) (ptree-augmenter ptree 0)
+    (i:ignore
+     (multiple-value-bind (names augmenter) (i:ptree-augmenter ptree 0)
        (declare (type (function (t simple-vector)) augmenter))
        (let* ((names-vec (coerce names 'vector))
               (nnames (length names-vec)))
@@ -14,9 +43,9 @@
            (declare (cl:ignore dynamic-env))
            (let ((vvec (make-array nnames)))
              (funcall augmenter combinand vvec)
-             (make-fixed-environment names-vec vvec static-env))))))
+             (i:make-fixed-environment names-vec vvec static-env))))))
     (symbol
-     (multiple-value-bind (names augmenter) (ptree-augmenter ptree 1)
+     (multiple-value-bind (names augmenter) (i:ptree-augmenter ptree 1)
        (declare (type (function (t simple-vector)) augmenter))
        (let* ((names-vec (coerce (list* eparam names) 'vector))
               (nnames (length names-vec)))
@@ -24,7 +53,7 @@
            (let ((vvec (make-array nnames)))
              (setf (svref vvec 0) dynamic-env)
              (funcall augmenter combinand vvec)
-             (make-fixed-environment names-vec vvec static-env))))))))
+             (i:make-fixed-environment names-vec vvec static-env))))))))
 
 ;;; We actually account for circularity here for old time's sake.
 ;;; And because it's consing anyway, so who cares about consing up a table too?
@@ -48,6 +77,26 @@
           (copy object)))
       object))
 
+(defclass derived-operative (i:operative)
+  ((%ptree :initarg :ptree :reader ptree) 
+   (%eparam :initarg :eparam :reader eparam :type (or ignore symbol))
+   (%env :initarg :env :reader static-environment)
+   ;; A function that, given the dynamic environment and combinand, returns a
+   ;; new environment to evaluate the body in. PLIST, EPARAM, and ENV are only
+   ;; there for introspection/completeness/whatever. One use is that they can
+   ;; be used when deserializing to recompute an augmenter.
+   (%augmenter :initarg :augmenter :accessor augmenter :type function)
+   ;; A list of forms (not just one form)
+   (%body :initarg :body :reader body)))
+(defmethod i:name ((object derived-operative))
+  `(syms::$vau ,(ptree object) ,(eparam object)))
+
+(defmethod i:combine ((combiner derived-operative) combinand env &optional frame)
+  (apply #'$sequence
+         (funcall (augmenter combiner) env combinand)
+         frame
+         (body combiner)))
+
 (defun make-derived-operative (static-env ptree eparam body)
   (let ((aug (make-augmenter static-env ptree eparam)))
     (make-instance 'derived-operative
@@ -59,84 +108,84 @@
 
 ;;; Frame for evaluating an $if condition.
 (declaim (inline make-if-frame))
-(defstruct (if-frame (:include frame)
+(defstruct (if-frame (:include i:frame)
                      (:constructor make-if-frame (parent then else env)))
   then else env)
 (defun bif (value then else dynenv frame)
-  (cond ((eq value true) (eval then dynenv frame))
-        ((eq value false) (eval else dynenv frame))
-        (t (error 'type-error :datum value :expected-type 'boolean))))
-(defmethod continue ((frame if-frame) value)
-  (continue
-   (frame-parent frame)
+  (cond ((eq value i:true) (i:eval then dynenv frame))
+        ((eq value i:false) (i:eval else dynenv frame))
+        (t (error 'type-error :datum value :expected-type 'i:boolean))))
+(defmethod i:continue ((frame if-frame) value)
+  (i:continue
+   (i:frame-parent frame)
    (bif value (if-frame-then frame) (if-frame-else frame) (if-frame-env frame)
-        (frame-parent frame))))
+        (i:frame-parent frame))))
 
 (declaim (inline make-$define!-frame))
-(defstruct ($define!-frame (:include frame)
+(defstruct ($define!-frame (:include i:frame)
                            (:constructor make-$define!-frame
                                (parent ptree env)))
   ptree env)
 (defun b$define! (ptree value env)
-  (bind-ptree ptree value
-              (lambda (symbol val state)
-                (declare (cl:ignore state))
-                (define val symbol env))
-              nil))
-(defmethod continue ((frame $define!-frame) value)
+  (i:bind-ptree ptree value
+                (lambda (symbol val state)
+                  (declare (cl:ignore state))
+                  (i:define val symbol env))
+                nil))
+(defmethod i:continue ((frame $define!-frame) value)
   (b$define! ($define!-frame-ptree frame) value ($define!-frame-env frame))
-  (continue (frame-parent frame) inert))
+  (i:continue (i:frame-parent frame) i:inert))
 
 (declaim (inline make-$set!-frame))
-(defstruct ($set!-frame (:include frame)
+(defstruct ($set!-frame (:include i:frame)
                         (:constructor make-$set!-frame
                             (parent ptree env)))
   ptree env)
 (defun b$set! (ptree value env)
-  (bind-ptree ptree value
-              (lambda (symbol value state)
-                (declare (cl:ignore state))
-                (setf (lookup symbol env) value))
-              nil))
-(defmethod continue ((frame $set!-frame) value)
+  (i:bind-ptree ptree value
+                (lambda (symbol value state)
+                  (declare (cl:ignore state))
+                  (setf (i:lookup symbol env) value))
+                nil))
+(defmethod i:continue ((frame $set!-frame) value)
   (b$set! ($set!-frame-ptree frame) value ($set!-frame-env frame))
-  (continue (frame-parent frame) inert))
+  (i:continue (i:frame-parent frame) i:inert))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defenv *ground* ()
   ;; core semantics
-  (defapp eval (form env) ignore frame (eval form env frame))
+  (defapp eval (form env) ignore frame (i:eval form env frame))
   (defapp combine (combiner combinand env) ignore frame
-    (combine combiner combinand env frame))
-  (defapp lookup (symbol env) ignore ignore (lookup symbol env))
+    (i:combine combiner combinand env frame))
+  (defapp lookup (symbol env) ignore ignore (i:lookup symbol env))
   ;; ignores
-  (defpred ignore? ignorep)
+  (defpred ignore? (lambda (obj) (eq obj i:ignore)))
   ;; environments
-  (defpred environment? environmentp)
+  (defpred environment? (lambda (obj) (typep obj 'i:environment)))
   (defapp make-environment (&rest parents) ignore ignore
-    (apply #'make-environment parents))
+    (apply #'i:make-environment parents))
   (defapp make-fixed-environment (symbols values &rest parents) ignore ignore
-    (apply #'make-fixed-environment symbols values parents))
+    (apply #'i:make-fixed-environment symbols values parents))
   (defapp make-immutable-environment (symbols values &rest parents) ignore ignore
-    (apply #'make-immutable-environment symbols values parents))
-  (defapp copy-env-immutable (env) ignore ignore (copy-env-immutable env))
+    (apply #'i:make-immutable-environment symbols values parents))
+  (defapp copy-env-immutable (env) ignore ignore (i:copy-env-immutable env))
   (defop  $define! (ptree form) env frame
     (let ((frame (make-$define!-frame frame ptree env)))
       (declare (dynamic-extent frame))
-      (b$define! ptree (eval form env frame) env)))
+      (b$define! ptree (i:eval form env frame) env)))
   (defop  $set! (ptree form) env frame
     (let ((frame (make-$set!-frame frame ptree env)))
       (declare (dynamic-extent frame))
-      (b$set! ptree (eval form env frame) env)))
+      (b$set! ptree (i:eval form env frame) env)))
   ;; operatives
   (defop  $vau (ptree eparam &rest body) static ignore
     (make-derived-operative static ptree eparam body))
-  (defpred operative? operativep)
+  (defpred operative? (lambda (obj) (typep obj 'i:operative)))
   ;; applicatives
-  (defpred applicative? applicativep)
-  (defapp wrap (combiner) ignore ignore (wrap combiner))
-  (defapp unwrap (applicative) ignore ignore (unwrap applicative))
+  (defpred applicative? (lambda (obj) (typep obj 'i:applicative)))
+  (defapp wrap (combiner) ignore ignore (i:wrap combiner))
+  (defapp unwrap (applicative) ignore ignore (i:unwrap applicative))
   ;; lists
   (defapp cons (car cdr) ignore ignore (cons car cdr))
   (defapp car (cons) ignore ignore
@@ -150,8 +199,8 @@
   (defpred cons? consp)
   (defpred null? null)
   (defapp copy-es (object) ignore ignore (copy-es object))
-  (defapp set-car! (pair object) ignore ignore (rplaca pair object) inert)
-  (defapp set-cdr! (pair object) ignore ignore (rplacd pair object) inert)
+  (defapp set-car! (pair object) ignore ignore (rplaca pair object) i:inert)
+  (defapp set-cdr! (pair object) ignore ignore (rplacd pair object) i:inert)
   ;; symbols
   (defpred symbol? symbolp)
   ;; equivalence
@@ -160,24 +209,9 @@
   (defop  $if (condition then else) dynenv frame
     (bif (let ((frame (make-if-frame frame then else dynenv)))
            (declare (dynamic-extent frame))
-           (eval condition dynenv frame))
+           (i:eval condition dynenv frame))
          then else dynenv frame))
-  (defpred boolean? booleanp)
+  (defpred boolean? (lambda (obj) (typep obj 'i:boolean)))
   ;; control
   (defop  $sequence (&rest forms) dynenv frame
-    (apply #'$sequence dynenv frame forms))
-  (defop  $make-catch-tag (name) ignore ignore
-    (multiple-value-list (make-catch-tag name)))
-  (defop  $catch (tag &rest body) dynenv frame
-    ;; FIXME: Frame for evaluating a catch tag.
-    (fcatch (eval tag dynenv frame)
-            (lambda (frame) (apply #'$sequence dynenv frame body))
-            frame))
-  (defapp throw (tag value) ignore frame (throw tag value frame))
-  ;; FIXME: Should be relativized to a continuation argument.
-  ;; In Racket, this (continuation-prompt-available?) has an optional
-  ;; continuation parameter, which is the current continuation
-  ;; by default.
-  (defapp tag-available? (tag) ignore frame
-    (boolify (tag-available-p tag frame)))
-  (defapp exit (&rest values) ignore ignore (cl:throw 'abort values)))
+    (apply #'$sequence dynenv frame forms)))

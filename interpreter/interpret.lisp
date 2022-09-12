@@ -2,7 +2,6 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass ignore () ()))
-(defun ignorep (object) (typep object 'ignore))
 (defconstant ignore
   (if (boundp 'ignore) (symbol-value 'ignore) (make-instance 'ignore)))
 (defmethod make-load-form ((object ignore) &optional env)
@@ -14,7 +13,6 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass inert () ()))
-(defun inertp (object) (typep object 'inert))
 (defconstant inert
   (if (boundp 'inert) (symbol-value 'inert) (make-instance 'inert)))
 (defmethod make-load-form ((object inert) &optional env)
@@ -23,6 +21,81 @@
   (if *print-escape*
       (call-next-method)
       (write-string "#inert" stream)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Frames
+;;;
+;;; Frames represent control stack frames. They are not continuations, but
+;;; continuations are made out of them. Every combination receives the parent
+;;; frame as an argument (representing the stack frame having a link to the
+;;; previous stack pointer/return address/etc). The continuation-related
+;;; primitives can then make continuations out of it. This means frames can have
+;;; dynamic extent and then the primitives can copy them. (the delimited
+;;; continuation primitives might have to copy them, since frames are mutable.)
+;;;
+;;; Frames are essentially a link to the parent plus whatever information is
+;;; needed to return to a point in the continuation. The root continuation
+;;; has a parent of NIL to indicate it as such. Frames also have marks, which
+;;; can be used to implement dynamic binding and guards, but I haven't done
+;;; that yet.
+;;;
+;;; Interpreter frames kind of suck - making a delimited continuation out of
+;;; them is going to be awkward. There needs to be enough information in each
+;;; frame to reconstruct a delimited continuation later, so that's a lot of
+;;; custom handling for anything we do in CL.
+;;;
+;;; Continuations are like Racket's, i.e. you have prompts, which are kind of
+;;; like CL:CATCH, and you can capture the continuation up to a given prompt to
+;;; get a delimited continuation. Originally I thought you'd just have explicit
+;;; escape continuations (like CL:BLOCK): this is more primitive in a sense, but
+;;; has the disadvantage that you're introducing objects that are only valid
+;;; within a given dynamic extent, which is pretty much unique to them, and
+;;; also makes them impossible to sensibly serialize.
+;;;
+;;; Unlike Racket, each prompt has two kinds of tag, the catch tag and the throw
+;;; tag. Separating these is analogous to the static key thing - you have a
+;;; binder and a reader, and you can choose which to make accessible to whom.
+;;;
+;;; Not having call/cc is pretty different from Kernel. I haven't yet decided
+;;; whether to have Kernel's whole continuation hierarchy business, but I do
+;;; like the general explicit design of the guards, and I like that the
+;;; primitive procedures are based on operating on a continuation object rather
+;;; than the current continuation implicitly (as e.g. dynamic-wind does).
+
+;;; Implementation-wise, rather than the usual Scheme interpreter that relies
+;;; on the host being tail-recursive and always invokes the continuation
+;;; rather than returning normally, we represent Burke control flow as CL
+;;; control flow, i.e. we just return normally and stuff. When we want to
+;;; abort, we cl:throw. When we want to extend, which CL of course cannot do,
+;;; we use a generic function CONTINUE, which performs all the actions in the
+;;; accumulated frames. We also mark in the CL dynamic environment where the
+;;; extension ends, at which point continue stops tail calling itself and just
+;;; returns normally (this cannot be indicated in the frames themselves, which
+;;; need to reflect the Burke frames).
+
+;;; Frames allocated during normal evaluation are on the stack. When the code
+;;; constructs a delimited continuation, the stack frames are copied into the
+;;; heap. It is expected this will be comparatively rare. A lower level
+;;; implementation may make a different tradeoff here. But the frames
+;;; probably need to be copied anyway since they're mutable (e.g. in the VM).
+
+;;; abstract
+(defstruct frame
+  (parent (error "missing arg") :type (or null frame) :read-only t))
+
+;;; Return VALUE to FRAME and resume computation.
+(defgeneric continue (frame value))
+
+(defvar *extension-base* nil)
+
+(defmethod continue :around ((frame frame) value)
+  (if (eq frame *extension-base*)
+      value
+      (call-next-method)))
+
+(defmethod continue ((frame null) value)
+  (error "Somehow reached the root frame with value ~a" value))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -62,7 +135,6 @@
 (defstruct (cell (:constructor make-cell (value))) value)
 
 (defclass environment () ())
-(defun environmentp (object) (typep object 'environment))
 
 (declaim (ftype (function (environment) (or environment null)) parent))
 (defgeneric map-parents (function environment)
@@ -107,15 +179,6 @@ If the symbol is not already bound, an error is signaled. This function never cr
     (if (cell-p cell)
         (setf (cell-value cell) new)
         (error "Cannot modify immutable binding of ~a" symbol))))
-
-(defun binds? (symbol environment)
-  "Returns (Lisp) true iff symbol is bound in environment, directly or indirectly."
-  (labels ((aux (environment)
-             (if (nth-value 1 (local-cell symbol environment))
-                 (return-from binds? t)
-                 (map-parents #'aux environment))))
-    (aux environment)
-    nil))
 
 ;;; An environment that allows mutability, suitable for global environments.
 ;;; This can be used like standard Kernel's environments.
@@ -316,36 +379,17 @@ If the symbol is not already bound, an error is signaled. This function never cr
   "Make an operative implemented as a CL function.
 The function will receive two arguments, the dynamic environment and the combinand."
   (make-instance 'builtin-operative :fun function :name name))
-(defclass derived-operative (operative)
-  ((%ptree :initarg :ptree :reader ptree) 
-   (%eparam :initarg :eparam :reader eparam :type (or ignore symbol))
-   (%env :initarg :env :reader env)
-   ;; A function that, given the dynamic environment and combinand, returns a
-   ;; new environment to evaluate the body in. PLIST, EPARAM, and ENV are only
-   ;; there for introspection/completeness/whatever. One use is that they can
-   ;; be used when deserializing to recompute an augmenter.
-   (%augmenter :initarg :augmenter :accessor augmenter :type function)
-   ;; A list of forms (not just one form)
-   (%body :initarg :body :reader body)))
-(defmethod name ((object derived-operative))
-  `(syms::$vau ,(ptree object) ,(eparam object)))
+
 (defclass applicative (combiner)
   ((%underlying :initarg :underlying :reader unwrap :type combiner)))
 (defmethod name ((app applicative)) (name (unwrap app)))
 
-(defun operativep (object) (typep object 'operative))
-(defun applicativep (object) (typep object 'applicative))
 (defun wrap (combiner) (make-instance 'applicative :underlying combiner))
 
 ;; Operative bodies are evaluated in a tail context, so we don't need new frames
 ;; for this stuff.
 (defmethod combine ((combiner builtin-operative) combinand env &optional frame)
   (funcall (builtin-impl combiner) env frame combinand))
-(defmethod combine ((combiner derived-operative) combinand env &optional frame)
-  (apply #'$sequence
-         (funcall (augmenter combiner) env combinand)
-         frame
-         (body combiner)))
 ;; A frame for an application (i.e. combination w/an applicative).
 ;; Specifically the frame is for when the arguments have not yet been eval'd,
 ;; which is how it's different from a combination-frame.
@@ -378,7 +422,6 @@ The function will receive two arguments, the dynamic environment and the combina
   (defclass boolean ()
     ((%value :initarg :value :reader value :type (member t nil)))))
 
-(defun booleanp (object) (typep object 'boolean))
 (defconstant true
   (if (boundp 'true) (symbol-value 'true) (make-instance 'boolean :value t)))
 (defconstant false
@@ -392,33 +435,3 @@ The function will receive two arguments, the dynamic environment and the combina
   (if *print-escape*
       (call-next-method)
       (format stream "#~c" (if (value object) #\t #\f))))
-
-(defun boolify (object) (if object true false))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;; Kernel defines some operatives as derived, but which are really dang
-;;; involved that way, like $sequence. Or having to derive them considerably
-;;; confuses other definitions, as with $let.
-
-(declaim (inline make-seq-frame))
-(defstruct (seq-frame (:include frame)
-                      (:constructor make-seq-frame (parent env to-go)))
-  env
-  ;; The list of forms still needing evaluation.
-  to-go)
-
-(defun $sequence (env frame &rest forms)
-  (cond ((null forms) inert)
-        ((null (rest forms)) (eval (first forms) env frame))
-        (t (loop for (form . rest) on forms
-                 if (null rest)
-                   return (eval form env frame) ; tail context
-                 else
-                   do (let ((frame (make-seq-frame frame env rest)))
-                        (declare (dynamic-extent frame))
-                        (eval form env frame))))))
-(defmethod continue ((frame seq-frame) value)
-  (continue (frame-parent frame)
-            (apply #'$sequence (seq-frame-env frame) (frame-parent frame)
-                   (seq-frame-to-go frame))))

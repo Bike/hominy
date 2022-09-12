@@ -175,10 +175,10 @@
                                  combinern combinandn env-var cenv)
   (let ((value (info:value combineri)))
     (typecase value
-      (i:macro
+      (baselib:macro
        (if (typep combinandn 'const)
            (multiple-value-bind (expansion expandedp)
-               (expand-macro (i:expander value) (value combinandn))
+               (expand-macro (baselib:expander value) (value combinandn))
              (if expandedp
                  (convert-form expansion env-var cenv)
                  (call-next-method)))

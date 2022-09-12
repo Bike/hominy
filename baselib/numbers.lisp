@@ -1,4 +1,4 @@
-(in-package #:burke/interpreter)
+(in-package #:burke/baselib)
 
 ;;; Kernel has a couple impedance mismatches with CL here.
 ;;; In particular I have not really looked at "inexact" numbers much.
@@ -114,15 +114,15 @@
 (defenv *number* ()
   ;; KLUDGE: In Kernel these are actual number syntax, not constants,
   ;; meaning the reader should be returning infinities when it sees these, not a symbol.
-  (define -infinity 'syms::-infinity *defining-environment*)
-  (define +infinity 'syms::+infinity *defining-environment*)
+  (i:define -infinity 'syms::-infinity *defining-environment*)
+  (i:define +infinity 'syms::+infinity *defining-environment*)
   ;; TODO: Extend a bunch of this stuff for any arity.
   (defapp number? (object) ignore ignore
     (boolify (typep object '(or rational exact-infinity))))
   (defapp finite? (object) ignore ignore
     (etypecase object
-      (rational true)
-      (exact-infinity false)))
+      (rational i:true)
+      (exact-infinity i:false)))
   (defapp integer? (object) ignore ignore (boolify (integerp object)))
   (defapp =? (num1 num2) ignore ignore (=?/2 num1 num2))
   (defapp <? (num1 num2) ignore ignore (<?/2 num1 num2))
@@ -137,16 +137,16 @@
     (boolify (etypecase number (rational (zerop number)) (exact-infinity nil))))
   (defapp positive? (number) ignore ignore
     (etypecase number
-      ((rational * (0)) false)
-      ((rational (0)) true)
-      (-infinity false)
-      (+infinity true)))
+      ((rational * (0)) i:false)
+      ((rational (0)) i:true)
+      (-infinity i:false)
+      (+infinity i:true)))
   (defapp negative? (number) ignore ignore
     (etypecase number
-      ((rational * (0)) true)
-      ((rational (0)) false)
-      (-infinity true)
-      (+infinity false)))
+      ((rational * (0)) i:true)
+      ((rational (0)) i:false)
+      (-infinity i:true)
+      (+infinity i:false)))
   (defapp odd? (number) ignore ignore
     (boolify (etypecase number (integer (oddp number)))))
   (defapp even? (number) ignore ignore

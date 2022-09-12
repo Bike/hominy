@@ -18,7 +18,7 @@
   (declare (ignore combiner combinern combinand env-var cenv))
   nil)
 
-(defun blookup (name) (i:lookup name i:*BASE*))
+(defun blookup (name) (i:lookup name baselib:*BASE*))
 
 ;;; Produce a seq node to evaluate the combiner, if we aren't sure that it's
 ;;; side-effect-free.

@@ -33,15 +33,15 @@
                      (bi (info) (make-instance 'binding :info info))
                      (ko (sym &optional (dynenvp t))
                        (make-instance 'info:known-operative
-                         :value (i:lookup sym i:*BASE*) :dynenvp dynenvp))
+                         :value (i:lookup sym baselib:*BASE*) :dynenvp dynenvp))
                      (ka (sym &optional (dynenvp t))
                        (info:wrap
                         (make-instance 'info:known-operative
-                          :value (i:unwrap (i:lookup sym i:*BASE*))
+                          :value (i:unwrap (i:lookup sym baselib:*BASE*))
                           :dynenvp dynenvp)))
                      (km (sym)
                        (make-instance 'info:macro
-                         :expander (i:expander (i:lookup sym i:*BASE*)))))
+                         :expander (baselib:expander (i:lookup sym baselib:*BASE*)))))
                 (append
                  ;; known operatives
                  (mapcar (lambda (name)

@@ -20,9 +20,9 @@
 
 (defun compile (combiner cenv)
   (etypecase combiner
-    (i:derived-operative
-     (%compile (i:ptree combiner) (i:eparam combiner)
-               (i:body combiner) cenv (i:env combiner)))
+    (baselib:derived-operative
+     (%compile (baselib:ptree combiner) (baselib:eparam combiner)
+               (baselib:body combiner) cenv (baselib:static-environment combiner)))
     (i:applicative
      (i:wrap (compile (i:unwrap combiner) cenv)))
     (i:combiner combiner)))

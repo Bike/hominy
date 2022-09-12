@@ -1,4 +1,4 @@
-(in-package #:burke/interpreter)
+(in-package #:burke/baselib)
 
 ;;; Facility for defining Burke environments full of combiners implemented in Lisp.
 
@@ -8,9 +8,9 @@
 (defvar *defining-environment*)
 
 (defmacro envspec ((&rest parents) &body body)
-  `(let ((*defining-environment* (make-environment ,@parents)))
+  `(let ((*defining-environment* (i:make-environment ,@parents)))
      ,@body
-     (copy-env-immutable *defining-environment*)))
+     (i:copy-env-immutable *defining-environment*)))
 
 ;;; Define a Lisp function that can be used as the function of a builtin Burke operative,
 ;;; i.e. it takes three arguments: the dynenv, the parent frame, and the combinand.
@@ -28,23 +28,27 @@
 (defun isymify (symbol) (intern (symbol-name symbol) "BURKE/INTERPRETER/SYMS"))
 
 (defmacro burke-operative (name lambda-list eparam fparam &body body)
-  `(make-instance 'builtin-operative
-     :fun (blambda ,lambda-list ,eparam ,fparam ,@body) :name ',(isymify name)))
+  `(i:make-builtin-operative
+    (blambda ,lambda-list ,eparam ,fparam ,@body) ',(isymify name)))
 
 (defmacro defop (name lambda-list eparam fparam &body body)
-  `(define (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)
+  `(i:define (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)
        ',(isymify name)
      *defining-environment*))
 
 (defmacro defapp (name lambda-list eparam fparam &body body)
-  `(define (wrap (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
+  `(i:define (i:wrap (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
        ',(isymify name)
      *defining-environment*))
+
+;;; Convert a Lisp boolean to a Burke one.
+(defun boolify (object) (if object i:true i:false))
 
 ;;; Convenience: Define a type predicate.
 (defmacro defpred (name lisp-name)
   `(defapp ,name (object) ignore ignore (boolify (,lisp-name object))))
 
 (defmacro defmac (name lambda-list eparam fparam &body body)
-  `(define (make-macro (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
+  `(i:define (make-macro
+              (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
        ',(isymify name) *defining-environment*))

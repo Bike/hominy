@@ -1,4 +1,4 @@
-(in-package #:burke/interpreter)
+(in-package #:burke/baselib)
 
 ;;;; This file defines Kernel's keyed static variables.
 ;;;; These are like symbols, in that they can be bound. They are unlike symbols in that
@@ -50,9 +50,9 @@
          (binder (%make-static-binder keyp)))
     (values binder key)))
 
-(defclass static-environment (environment) ())
+(defclass static-environment (i:environment) ())
 
-(defmethod define (new (name static-key) (env static-environment))
+(defmethod i:define (new (name static-key) (env static-environment))
   (declare (ignore new))
   (error "New bindings cannot be added to a static environment"))
 
@@ -62,18 +62,18 @@
    (%names :initarg :names :reader names :type simple-vector)
    (%vvec :initarg :vvec :reader vvec :type simple-vector)))
 
-(defmethod map-parents (function (env static-fixed-environment))
+(defmethod i:map-parents (function (env static-fixed-environment))
   (mapc function (parents env)))
 ;;; Although static environments are environments, for normal evaluation purposes they are empty.
 ;;; LOOKUP does not work on static keys; you have to use static-lookup.
 ;;; This is to avoid any punning confusion, to keep the evaluation rules simple and unambiguous,
 ;;; and to compartmentalize static environments.
-(defmethod local-lookup (symbol (env static-fixed-environment)) (values nil nil))
-(defmethod map-bindings (function (env static-fixed-environment)) (declare (ignore function)))
+(defmethod i:local-cell (symbol (env static-fixed-environment)) (values nil nil))
+(defmethod i:map-bindings (function (env static-fixed-environment)) (declare (ignore function)))
 
 (defgeneric local-static-lookup (key environment))
 
-(defmethod local-static-lookup ((key static-key) (env environment)) (values nil nil))
+(defmethod local-static-lookup ((key static-key) (env i:environment)) (values nil nil))
 
 (defmethod local-static-lookup ((name static-key) (env static-fixed-environment))
   (let ((pos (position name (names env) :key #'trivial-garbage:weak-pointer-value)))
@@ -86,7 +86,7 @@
              (multiple-value-bind (value presentp) (local-static-lookup key environment)
                (if presentp
                    (return-from static-lookup value)
-                   (map-parents #'aux environment)))))
+                   (i:map-parents #'aux environment)))))
     (aux environment)
     (error "Unbound static key ~a" key)))
 
@@ -123,16 +123,17 @@
 ;;; Like ptree-names but with static binders instead of symbols.
 (defun static-ptree-names (static-ptree)
   (etypecase static-ptree
-    ((or ignore null) nil)
+    ((or i:ignore null) nil)
     (static-binder (list static-ptree))
-    (cons (nconc (static-ptree-names (car static-ptree)) (static-ptree-names (cdr static-ptree))))))
+    (cons (nconc (static-ptree-names (car static-ptree))
+                 (static-ptree-names (cdr static-ptree))))))
 
 (defun static-bindings->namevec (bindings)
   (coerce (loop for (static-ptree) in bindings nconc (static-ptree-names static-ptree)) 'vector))
 
 (defun bind-static-ptree (static-ptree value function state)
   (etypecase static-ptree
-    (ignore state)
+    (i:ignore state)
     (null (unless (null value) (error "Too many arguments")) state)
     (static-binder (funcall function static-ptree value state))
     (cons (unless (consp value) (error "Not enough arguments"))
@@ -150,7 +151,7 @@
 (defun static-fill-values (bindings vec env frame)
   (loop with index = 0
         for (static-ptree form) in bindings
-        for value = (eval form env frame)
+        for value = (i:eval form env frame)
         do (setf index (bind-static-ptree-to-vector static-ptree value vec index))))
 
 (defenv *static* ()
@@ -183,8 +184,8 @@
   ;; TODO: Make this into a macro for efficiency - see below for definition
   ;; But maybe it doesn't matter, since only macroexpanders really need to use $once-only anyway.
   (let (;; KLUDGE
-        (static-variable (lookup 'syms::static-variable *defining-environment*))
-        ($let-static (lookup 'syms::$let-static *defining-environment*)))
+        (static-variable (i:lookup 'syms::static-variable *defining-environment*))
+        ($let-static (i:lookup 'syms::$let-static *defining-environment*)))
     (defop  $once-only (bindings &rest body) env ignore
       ;; FIXME: Frames for the valf evaluations
       (let* (;; analogous to the gensym list.
@@ -193,10 +194,10 @@
                        bindings))
              (forms (mapcar (lambda (static) (list static-variable (second static)))
                             statics))
-             (new-env (make-fixed-environment (mapcar #'first bindings) forms env))
+             (new-env (i:make-fixed-environment (mapcar #'first bindings) forms env))
              (result (apply #'$sequence new-env body)))
         `(,$let-static (,@(mapcar (lambda (bind static)
-                                    `(,(first static) ,(eval (second bind) env)))
+                                    `(,(first static) ,(i:eval (second bind) env)))
                                   bindings statics))
             ,result)))))
 

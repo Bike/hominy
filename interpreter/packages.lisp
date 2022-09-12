@@ -9,20 +9,16 @@
   (:shadow #:eval #:boolean #:variable #:ignore #:throw #:continue)
   (:export #:eval #:combine #:call #:evalseq)
   (:export #:combiner #:operative #:applicative #:wrap #:unwrap
-           #:make-builtin-operative #:make-derived-operative)
+           #:make-builtin-operative)
   (:export #:name)
-  (:export #:macro #:make-macro #:expander)
   (:export #:ignore #:inert #:boolean #:true #:false)
-  (:export #:frame #:continue)
-  (:export #:environment #:define #:lookup #:make-environment #:make-fixed-environment
+  (:export #:frame #:frame-parent #:continue)
+  (:export #:environment #:define #:lookup #:map-parents #:map-bindings #:local-cell
+           #:make-environment #:make-fixed-environment
            #:make-fixed-environment-with-cells
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment
            #:make-immutable-environment #:copy-env-immutable)
   (:export #:make-cell #:cell-value)
-  (:export #:*base*)
-  (:export #:bind-ptree-to-vector)
-  ;; Derived operative internals, for use with compilers
-  ;; TODO: rename env to static-env, probably
-  (:export #:derived-operative #:ptree #:eparam #:env #:body)
+  (:export #:ptree-augmenter #:bind-ptree #:bind-ptree-to-vector)
   ;; Serialization
   (:export #:marshal #:marshal-to-file #:unmarshal #:unmarshal-from-file))

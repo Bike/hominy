@@ -46,7 +46,7 @@
 (defun repl (&key (modules nil))
   (let* ((*readtable* *burke-readtable*)
          (*package* (find-package "BURKE/INTERPRETER/SYMS"))
-         (repl-env (apply #'i:make-environment i:*base* modules)))
+         (repl-env (apply #'i:make-environment baselib:*base* modules)))
     (catch 'abort
       (with-simple-restart (abort "Abort the Burke REPL.")
         (loop (with-simple-restart (continue "Return to the Burke REPL.")
