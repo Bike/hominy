@@ -152,23 +152,37 @@
                            env-var cenv)
       (call-next-method)))
 
+(defun expand-macro (expander combinand)
+  (multiple-value-bind (expansion error)
+      ;; FIXME: IGNORE-ERRORS may not be ideal
+      ;; wrt NLX within burke.
+      (ignore-errors (ctcombine expander combinand))
+    (cond (error
+           (warn "~a while macroexpanding: ~a" 'error error)
+           (values nil nil))
+          (t (values expansion t)))))
+
 (defmethod %convert-combination ((combineri info:macro) combinern combinandn env-var cenv)
   (if (typep combinandn 'const)
-      (multiple-value-bind (expansion error)
-          ;; FIXME: IGNORE-ERRORS may not be ideal
-          ;; wrt NLX within burke.
-          (ignore-errors (ctcombine (info:expander combineri)
-                                    (value combinandn)))
-        (cond (error
-               (warn "~a while macroexpanding: ~a" 'error error)
-               (call-next-method))
-              (t (convert-form expansion env-var cenv))))
+      (multiple-value-bind (expansion expandedp)
+          (expand-macro (info:expander combineri) (value combinandn))
+        (if expandedp
+            (convert-form expansion env-var cenv)
+            (call-next-method)))
       (call-next-method)))
 
 (defmethod %convert-combination ((combineri info:constant)
                                  combinern combinandn env-var cenv)
   (let ((value (info:value combineri)))
     (typecase value
+      (i:macro
+       (if (typep combinandn 'const)
+           (multiple-value-bind (expansion expandedp)
+               (expand-macro (i:expander value) (value combinandn))
+             (if expandedp
+                 (convert-form expansion env-var cenv)
+                 (call-next-method)))
+           (call-next-method)))
       (i:operative
        (or (and (typep combinandn 'const)
                 (convert-known-operation value combinern (value combinandn)
