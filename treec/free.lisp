@@ -48,9 +48,8 @@
   (union
    ;; Stuff that's enclosed in the body but also bound here is irrelevant.
    ;; (The LETN will check the enclosed of its body, not itself.)
-   (set-difference (enclosed (body letn))
-                   (reduce #'append (ptrees letn) :key #'ptree-symbols))
-   (reduce #'union (value-nodes letn) :key #'enclosed :initial-value ())))
+   (set-difference (enclosed (body letn)) (ptree-symbols (ptree letn)))
+   (enclosed (value letn))))
 (defmethod enclosed ((op operative)) (free op))
 
 (defgeneric sets (node))
@@ -72,9 +71,8 @@
   (union (sets (if-cond ifn)) (union (sets (then ifn)) (sets (else ifn)))))
 (defmethod sets ((letn letn))
   (union
-   (set-difference (sets (body letn))
-                   (reduce #'append (ptrees letn) :key #'ptree-symbols))
-   (reduce #'union (value-nodes letn) :key #'sets :initial-value ())))
+   (set-difference (sets (body letn)) (ptree-symbols (ptree letn)))
+   (sets (value letn))))
 (defmethod sets ((op operative))
   (set-difference (sets (body op)) (ptree-symbols (cons (eparam op) (ptree op)))))
 

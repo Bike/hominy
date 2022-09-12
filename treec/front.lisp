@@ -82,12 +82,12 @@
          (eparam (eparam combinern))
          (inner-reified-p (static-env-var combinern))
          ;; If the eparam exists and is free in the body, we gotta bind it.
-         ;; Also gotta bind it if the operative needs a reified inner environment.
+         ;; ...counting "the environment is reified" as free.
          (dynenv-bind-p (and (symbolp eparam)
                              (or inner-reified-p (member eparam bfree)))))
     (make-instance 'letn
-      :ptrees (list (ptree combinern)) :value-nodes (list combinandn)
-      :dynenv-bind (if dynenv-bind-p eparam nil)
+      :ptree (ptree combinern) :value combinandn
+      :dynenv-bind (if dynenv-bind-p eparam i:ignore)
       :inner-env-var (if inner-reified-p (env-var combinern) nil)
       ;; If we need to bind the dynenv, it's free.
       ;; This is true even if the operative doesn't need a reified static environment:

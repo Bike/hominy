@@ -280,75 +280,68 @@
          (acons ptree node nil)))))
 
 (defmethod translate ((node letn) context)
-  (loop with vcontext = (context context :valuep t :tailp nil)
-        with cf = (cfunction context)
-        with body = (body node)
-        with enclosed-set = (enclosed-sets body)
-        with index = (nregs context)
-        with inner-envv = (inner-env-var node)
-        for ptree in (ptrees node)
-        for valuen in (value-nodes node)
-        for ptree-bindings
-          = (ptree-bindings ptree index inner-envv enclosed-set)
-        nconc ptree-bindings into new-locals
-        do (incf index (length ptree-bindings))
-           (translate valuen vcontext)
-           ;; We use one stack spot for the value.
-           (setf vcontext (context vcontext :new-stack 1))
-        finally
-           ;; Now that we've computed all the values, write them into the regs.
-           ;; We do this backwards since we pushed left to right.
-           (mark-stack
-            (+ (nstack vcontext)
-               (loop for ptree in (reverse (ptrees node))
-                     for pstack = (gen-ptree cf ptree new-locals)
-                     for i from 0 ; how many of the values' stack slots we've used
-                     maximizing (- pstack i))))
-           ;; Main event. First, bind environment crap.
-           (let* ((outer-envv (static-env-var node))
-                  (oeb (dynenv-bind node))
-                  (outer-env-index
-                    (when (or oeb inner-envv)
-                      (or (second (assoc outer-envv (locals context)))
-                          (error "?? Reified environment ~a missing" outer-envv))))
-                  (estack 0))
-             (when oeb
-               ;; Bind the dynenv parameter.
-               ;; NOTE: Since treec is simple, we know the local environment, i.e.
-               ;; what's in outer-env-index, is never cloistered (in a cell).
-               ;; TODO: If the OEB is never actually mutated, we could just use it
-               ;; as an alias - like push a binding to an index that's exactly the
-               ;; same as the outer index.
-               (asm:assemble cf 'o:ref outer-env-index)
-               (let ((cellp (or inner-envv (member oeb enclosed-set))))
-                 (when cellp (asm:assemble cf 'o:make-cell))
-                 (asm:assemble cf 'o:set index)
-                 (push (list oeb index cellp) new-locals))
-               (incf index)
-               (incf estack))
-             (when inner-envv ; haveta reify
-               ;; Get the parent environment
-               (asm:assemble cf 'o:ref outer-env-index)
-               ;; Grab all the locals to put into the reified environment.
-               (loop for (var vindex _2) in new-locals
-                     do (asm:assemble cf 'o:ref vindex)
-                     collect var into vars
-                     finally (asm:assemble cf 'o:make-environment
-                               (asm:constant-index cf vars)
-                               'o:set index))
-               ;; This actually overestimates the stack by 1 if the oeb also exists.
-               ;; FIXME
-               (incf estack (1+ (length new-locals)))
-               ;; just to reiterate - local environments never need to be in cells.
-               (push (list inner-envv index nil) new-locals)
-               (incf index))
-             (mark-regs (+ (nregs context) (length new-locals)))
-             (mark-stack (+ (nstack context) estack))
-             ;; At this point the stack is where it was when the $let was entered,
-             ;; so the body context doesn't need new stack.
-             (translate (body node)
-                        (context context :new-locals new-locals
-                                 :new-regs (length new-locals))))))
+  (let* ((ptree (ptree node))
+         (picked (pick-apart-bind ptree (value node)))
+         (cf (cfunction context))
+         (body (body node))
+         (enclosed-set (enclosed-sets body))
+         (index (nregs context))
+         (inner-envv (inner-env-var node))
+         (eparam (dynenv-bind node))
+         (outer-envv (static-env-var node))
+         (outer-env-index (second (assoc outer-envv (locals context))))
+         (new-locals (op-bindings ptree eparam inner-envv enclosed-set index))
+         (ptree-stack 0)
+         (estack 0))
+    (assert (or (not (or inner-envv eparam)) outer-env-index))
+    ;; Compute all the values.
+    (loop for (_ . value) in picked
+          for nstack from 0
+          for ncontext = (context context :valuep t :tailp nil
+                                          :new-stack nstack)
+          do (translate value ncontext))
+    ;; Bind 'em. We pushed left to right so now we go right to left.
+    ;; As mentioned in the setn method below, we could rearrange the
+    ;; evaluations arbitrarily if we were so inclined.
+    (setf ptree-stack
+          (loop for (ptree) in (nreverse picked)
+                for nstack downfrom (length picked)
+                maximizing (+ nstack (gen-ptree cf ptree new-locals))))
+    ;; Bind environment crap.
+    (when eparam
+      ;; Bind the dynenv parameter.
+      ;; NOTE: Since treec is simple, we know the local environment, i.e.
+      ;; what's in outer-env-index, is never cloistered (in a cell).
+      ;; TODO: If the eparam is never actually mutated, we could just use it
+      ;; as an alias - like push a binding to an index that's exactly the
+      ;; same as the outer index.
+      (let ((eparam-info (assoc eparam new-locals)))
+        (asm:assemble cf 'o:ref outer-env-index)
+        (when (third eparam-info) ; cell
+          (asm:assemble cf 'o:make-cell))
+        (asm:assemble cf 'o:set index))
+      (incf estack))
+    (when inner-envv ; haveta reify
+      ;; Get the parent environment
+      (asm:assemble cf 'o:ref outer-env-index)
+      ;; Grab all the locals to put into the reified environment.
+      (let ((lin (if (typep eparam 'i:ignore)
+                     (ptree-symbols ptree)
+                     (list* eparam (ptree-symbols ptree)))))
+        (loop for var in lin
+              for index = (second (assoc var new-locals))
+              do (asm:assemble cf 'o:ref index))
+        (asm:assemble cf 'o:make-environment
+          (asm:constant-index cf lin)
+          'o:set index)
+        (incf estack (1+ (length lin)))))
+    (mark-regs (+ (nregs context) (length new-locals)))
+    (mark-stack (+ (nstack context) ptree-stack estack))
+    ;; At this point the stack is where it was when the $let was entered,
+    ;; so the body context doesn't need new stack.
+    (translate body
+               (context context :new-locals new-locals
+                                :new-regs (length new-locals)))))
 
 (defmethod translate ((node setn) context)
   (let ((pairs (pick-apart-bind (ptree node) (value node))))

@@ -121,11 +121,11 @@
        (side-effect-free-p (then node))
        (side-effect-free-p (else node))))
 
-;;; Used to convert $let-type bindings as well as inline operatives.
+;;; Used to convert inline operatives, and by extension, $let.
 (defclass letn (node)
-  ((%ptrees :initarg :ptrees :reader ptrees :type list)
-   (%value-nodes :initarg :value-nodes :reader value-nodes :type list)
-   ;; The variable bound to the environment the $let is evaluated in.
+  ((%ptree :initarg :ptree :reader ptree)
+   (%value :initarg :value :reader value :type node)
+   ;; The variable bound to the environment the let is evaluated in.
    (%static-env-var :initarg :static-env-var :reader static-env-var :type symbol)
    ;; A variable the $let will bind to the environment it is evaluated in
    ;; (for conversion of inline operatives), or NIL if not bound.
@@ -139,5 +139,4 @@
    (%body :initarg :body :reader body :type node)))
 (defmethod info ((node letn)) (info (body node)))
 (defmethod side-effect-free-p ((node letn))
-  (and (every #'side-effect-free-p (value-nodes node))
-       (side-effect-free-p (body node))))
+  (and (side-effect-free-p (value node)) (side-effect-free-p (body node))))

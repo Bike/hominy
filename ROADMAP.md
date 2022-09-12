@@ -112,8 +112,8 @@ Anyway, quick TODO list, in no order:
  - X inline applicatives with VM equivalents
  - X mutation
   - X inline $set!
- - inline $let
- - multiple value optimization: don't heap-cons for e.g. ($set! (a b) (list c d))
+ - X efficient $let macro
+ - X multiple value optimization: don't heap-cons for e.g. ($set! (a b) (list c d))
  - X macroexpand
   - X optimize combinations with literal operatives
  - direct calls

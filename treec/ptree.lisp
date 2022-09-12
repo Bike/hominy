@@ -14,16 +14,16 @@
 ;;; If the local environment variable is NIL, proceed without reification.
 ;;; A binding will be cellp only if either the local environment is reified,
 ;;; or if the variable is a member of the enclosed set.
-(defun op-bindings (ptree eparam env-var enclosed-set)
+(defun op-bindings (ptree eparam env-var enclosed-set &optional (start 0))
   ;; We order things as follows: eparam, then local environment,
   ;; then the symbols in the ptree in depth first order (going car->cdr).
   ;; If the eparam and/or the local environment aren't needed they're not bound.
-  (let* ((eparam-index (if (typep eparam 'i:ignore) nil 0))
-         (local-env-index (cond ((not env-var) nil) (eparam-index 1) (t 0)))
+  (let* ((eparam-index (if (typep eparam 'i:ignore) nil start))
+         (local-env-index (cond ((not env-var) nil) (eparam-index 1) (t start)))
          ;; Index to start binding ptree symbols at.
          (index (cond (local-env-index (1+ local-env-index))
                       (eparam-index (1+ eparam-index))
-                      (t 0))))
+                      (t start))))
     (labels ((cellp (sym) (if (or env-var (member sym enclosed-set)) t nil))
              (aux (ptree)
                (etypecase ptree
