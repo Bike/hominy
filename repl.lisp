@@ -30,13 +30,16 @@
     (install-reader-macros rt)
     rt))
 
-(defun read-from-string (string &optional (eof-error-p t) eof-value
-                         &key (start 0) end preserve-whitespace)
-  (let ((*readtable* *burke-readtable*)
-        (*package* (find-package "BURKE/INTERPRETER/SYMS")))
-    (cl:read-from-string string eof-error-p eof-value
-                         :start start :end end
-                         :preserve-whitespace preserve-whitespace)))
+(locally
+    #+sbcl
+  (declare (sb-ext:muffle-conditions style-warning)) ; &optional and &key complaint
+  (defun read-from-string (string &optional (eof-error-p t) eof-value
+                           &key (start 0) end preserve-whitespace)
+    (let ((*readtable* *burke-readtable*)
+          (*package* (find-package "BURKE/INTERPRETER/SYMS")))
+      (cl:read-from-string string eof-error-p eof-value
+                           :start start :end end
+                           :preserve-whitespace preserve-whitespace))))
 
 (defun read (&optional (stream *standard-input*) (eof-error-p t) eof-value recursivep)
   (let ((*readtable* *burke-readtable*)
