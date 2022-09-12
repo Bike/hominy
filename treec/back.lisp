@@ -261,6 +261,24 @@
              (asm:assemble cf 'o:enclose (asm:constant-index cf opcf))))
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
+;;; Given a ptree and a node providing its value, return an alist of
+;;; (ptree . node) that will need to be bound-or-set. This takes apart list
+;;; nodes only used for binding, to avoid actually consing lists.
+(defun pick-apart-bind (ptree node)
+  (etypecase ptree
+    (null
+     (if (or (and (typep node 'const) (null (value node)))
+             (and (typep node 'listn) (null (elements node))))
+         nil
+         (acons ptree node nil)))
+    ((or i:ignore symbol) (acons ptree node nil))
+    (cons
+     (if (typep node 'listn)
+         (let ((elems (elements node)))
+           (append (pick-apart-bind (car ptree) (first elems))
+                   (pick-apart-bind (cdr ptree) (make-listn (rest elems)))))
+         (acons ptree node nil)))))
+
 (defmethod translate ((node letn) context)
   (loop with vcontext = (context context :valuep t :tailp nil)
         with cf = (cfunction context)
@@ -333,7 +351,21 @@
                                  :new-regs (length new-locals))))))
 
 (defmethod translate ((node setn) context)
-  (translate (value node) (context context :valuep t :tailp nil))
-  (mark-stack (+ (nstack context) 1 ; for the value
-                 (set-ptree (cfunction context) (ptree node) (locals context))))
+  (let ((pairs (pick-apart-bind (ptree node) (value node))))
+    ;; Ensure the values are all evaluated before setting anything.
+    ;; (We're free to reorder these evaluations, but treec isn't really
+    ;;  smart enough to make any use of that.)
+    (loop for (_ . value) in pairs
+          for nstack from 0
+          for ncontext = (context context :valuep t :tailp nil :new-stack nstack)
+          do (translate value ncontext))
+    ;; Now for ($set! (a b c) (list x y z)) we have x y z on the stack.
+    ;; So set c, then b, etc.
+    (mark-stack
+     (+ (nstack context)
+        (loop with cf = (cfunction context)
+              with locals = (locals context)
+              for (ptree) in (nreverse pairs)
+              for nstack downfrom (length pairs)
+              maximizing (+ nstack (set-ptree cf ptree locals))))))
   (translate-constant i:inert context))
