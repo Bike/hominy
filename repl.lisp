@@ -50,6 +50,9 @@
   (let* ((*readtable* *burke-readtable*)
          (*package* (find-package "BURKE/INTERPRETER/SYMS"))
          (repl-env (apply #'i:make-environment baselib:*base* modules)))
+    ;; KLUDGE
+    (i:define baselib:*basec* 'burke/interpreter/syms::compilation-environment
+      repl-env)
     (catch 'abort
       (with-simple-restart (abort "Abort the Burke REPL.")
         (loop (with-simple-restart (continue "Return to the Burke REPL.")

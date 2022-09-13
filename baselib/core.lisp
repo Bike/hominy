@@ -18,7 +18,7 @@
     (aux environment)
     nil))
 
-(defenv *core* (*ground*)
+(defenv (*core* *corec*) (*ground*)
   (defapp list (&rest elems) ignore ignore elems)
   (defapp list* (&rest elems) ignore ignore (apply #'list* elems))
   (let ((wrap (i:lookup 'syms::wrap *ground*))

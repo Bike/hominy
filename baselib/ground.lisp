@@ -153,7 +153,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defenv *ground* ()
+(defenv (*ground* *groundc*) ()
   ;; core semantics
   (defapp eval (form env) ignore frame (i:eval form env frame))
   (defapp combine (combiner combinand env) ignore frame

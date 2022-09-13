@@ -154,7 +154,7 @@
         for value = (i:eval form env frame)
         do (setf index (bind-static-ptree-to-vector static-ptree value vec index))))
 
-(defenv *static* ()
+(defenv (*static* *staticc*) ()
   (defop  $make-static-key (&optional name) ignore ignore
     (multiple-value-list (make-static-key name)))
   (defapp make-static-fixed-environment (binders values &rest parents) ignore ignore

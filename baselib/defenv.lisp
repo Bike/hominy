@@ -3,14 +3,23 @@
 ;;; Facility for defining Burke environments full of combiners implemented in Lisp.
 
 (defmacro defenv (name (&rest parents) &body body)
-  `(defparameter ,name (envspec (,@parents) ,@body)))
+  (if (symbolp name)
+      `(defparameter ,name (envspec (,@parents) ,@body))
+      `(progn
+         (defvar ,(first name))
+         (defvar ,(second name))
+         (setf (values ,(first name) ,(second name))
+               (envspec (,@parents) ,@body)))))
 
 (defvar *defining-environment*)
+(defvar *defining-compilation-bindings*)
 
 (defmacro envspec ((&rest parents) &body body)
-  `(let ((*defining-environment* (i:make-environment ,@parents)))
+  `(let ((*defining-environment* (i:make-environment ,@parents))
+         (*defining-compilation-bindings* nil))
      ,@body
-     (i:copy-env-immutable *defining-environment*)))
+     (values (i:copy-env-immutable *defining-environment*)
+             (apply #'cenv:make-cenv nil t *defining-compilation-bindings*))))
 
 ;;; Define a Lisp function that can be used as the function of a builtin Burke operative,
 ;;; i.e. it takes three arguments: the dynenv, the parent frame, and the combinand.
@@ -32,14 +41,25 @@
     (blambda ,lambda-list ,eparam ,fparam ,@body) ',(isymify name)))
 
 (defmacro defop (name lambda-list eparam fparam &body body)
-  `(i:define (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)
-       ',(isymify name)
-     *defining-environment*))
+  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+     (i:define op ',(isymify name) *defining-environment*)
+     (push (cons ',(isymify name)
+                 (make-instance 'cenv:binding
+                   :info (make-instance 'info:known-operative
+                           :dynenvp ,(not (eq eparam 'ignore))
+                           :value op)))
+           *defining-compilation-bindings*)))
 
 (defmacro defapp (name lambda-list eparam fparam &body body)
-  `(i:define (i:wrap (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
-       ',(isymify name)
-     *defining-environment*))
+  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+     (i:define (i:wrap op) ',(isymify name) *defining-environment*)
+     (push (cons ',(isymify name)
+                 (make-instance 'cenv:binding
+                   :info (info:wrap
+                          (make-instance 'info:known-operative
+                            :dynenvp ,(not (eq eparam 'ignore))
+                            :value op))))
+           *defining-compilation-bindings*)))
 
 ;;; Convert a Lisp boolean to a Burke one.
 (defun boolify (object) (if object i:true i:false))
@@ -49,6 +69,9 @@
   `(defapp ,name (object) ignore ignore (boolify (,lisp-name object))))
 
 (defmacro defmac (name lambda-list eparam fparam &body body)
-  `(i:define (make-macro
-              (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body))
-       ',(isymify name) *defining-environment*))
+  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+     (i:define (make-macro op) ',(isymify name) *defining-environment*)
+     (push (cons ',(isymify name)
+                 (make-instance 'cenv:binding
+                   :info (make-instance 'info:macro :expander op)))
+           *defining-compilation-bindings*)))

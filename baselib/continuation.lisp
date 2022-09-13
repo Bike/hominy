@@ -73,7 +73,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defenv *continuation* ()
+(defenv (*continuation* *continuationc*) ()
   (defop  $make-catch-tag (name) ignore ignore
     (multiple-value-list (make-catch-tag name)))
   (defop  $catch (tag &rest body) dynenv frame

@@ -20,7 +20,7 @@
    (i:frame-parent frame)
    (i:eval value (macroexpansion-frame-env frame) (i:frame-parent frame))))
 
-(defenv *macro* ()
+(defenv (*macro* *macroc*) ()
   (defapp make-macro (expander) ignore ignore (make-macro expander))
   (defapp macro-expander (macro) ignore ignore (expander macro))
   (let (($vau (i:lookup 'syms::$vau *ground*))

@@ -111,7 +111,7 @@
                 (exact-infinity 0)))
     (exact-infinity (etypecase n2 (rational n1)))))
 
-(defenv *number* ()
+(defenv (*number* *numberc*) ()
   ;; KLUDGE: In Kernel these are actual number syntax, not constants,
   ;; meaning the reader should be returning infinities when it sees these, not a symbol.
   (i:define -infinity 'syms::-infinity *defining-environment*)

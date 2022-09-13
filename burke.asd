@@ -9,8 +9,11 @@
                  #+(or) ; needs special conspack
                  (:file "marshal" :depends-on ("interpret" "packages"))))
    (:file "packages" :depends-on ("interpreter"))
+   (:file "type" :depends-on ("packages"))
+   (:file "info" :depends-on ("type" "packages"))
+   (:file "compilation-environment" :depends-on ("interpreter" "info" "packages"))
    (:module "baselib"
-    :depends-on ("interpreter" "packages")
+    :depends-on ("compilation-environment" "interpreter" "packages")
     :components ((:file "defenv")
                  (:file "ground" :depends-on ("defenv"))
                  (:file "continuation" :depends-on ("ground" "defenv"))
@@ -27,10 +30,6 @@
                  (:file "vm" :depends-on ("ops" "packages"))
                  (:file "asm" :depends-on ("vm" "packages"))
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
-   (:file "type" :depends-on ("packages"))
-   (:file "info" :depends-on ("type" "packages"))
-   (:file "compilation-environment" :depends-on ("interpreter" "info"
-                                                               "packages"))
    (:module "treec"
     :depends-on ("compilation-environment" "info" "vm" "interpreter")
     :components ((:file "packages")

@@ -1,14 +1,3 @@
-(defpackage #:burke/baselib
-  (:use #:cl)
-  (:local-nicknames (#:i #:burke/interpreter)
-                    (#:syms #:burke/interpreter/syms))
-  ;; Derived operative internals, for use with compilers
-  (:export #:derived-operative #:ptree #:eparam #:static-environment #:body)
-  ;; Macros
-  (:export #:macro #:make-macro #:expander)
-  ;; Ultimate product
-  (:export #:*base*))
-
 (defpackage #:burke/type
   (:use #:cl)
   (:shadow #:type #:cons #:list
@@ -40,12 +29,25 @@
 (defpackage #:burke/cenv
   (:use #:cl)
   (:local-nicknames (#:info #:burke/info)
-                    (#:i #:burke/interpreter)
-                    (#:baselib #:burke/baselib))
+                    (#:i #:burke/interpreter))
   (:export #:binding #:info)
-  (:export #:cenvironment #:empty-cenv #:make-cenv #:make-standard-cenv
-           #:augment1 #:lookup)
-  (:export #:module))
+  (:export #:cenvironment #:empty-cenv #:make-cenv #:augment1 #:lookup))
+
+(defpackage #:burke/baselib
+  (:use #:cl)
+  (:local-nicknames (#:i #:burke/interpreter)
+                    (#:syms #:burke/interpreter/syms)
+                    (#:info #:burke/info)
+                    (#:cenv #:burke/cenv))
+  ;; Environment definition stuff
+  (:export #:defenv #:*defining-environment*
+           #:defop #:defapp #:defmac #:boolify #:defpred)
+  ;; Derived operative internals, for use with compilers
+  (:export #:derived-operative #:ptree #:eparam #:static-environment #:body)
+  ;; Macros
+  (:export #:macro #:make-macro #:expander)
+  ;; Ultimate products
+  (:export #:*base* #:*basec*))
 
 (defpackage #:burke/ir
   (:use #:cl)
