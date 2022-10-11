@@ -435,3 +435,37 @@ The function will receive two arguments, the dynamic environment and the combina
   (if *print-escape*
       (call-next-method)
       (format stream "#~c" (if (value object) #\t #\f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; User-defined classes
+
+(defclass user-class ()
+  ((%nslots :initarg :nslots :reader nslots :type (integer 0))))
+
+;;; We could maaaaaybe implement these more efficiently by having each Burke
+;;; class use a Lisp defstruct - avoid the indirect vector that way.
+;;; But like who cares, man.
+(defstruct (object (:constructor make-object
+                       (class &aux (storage (make-array (nslots class))))))
+  (class (error "missing arg") :type user-class :read-only t)
+  (storage (error "missing arg") :type simple-vector :read-only t))
+
+(defun construct-user-object (class &rest slot-values)
+  (assert (= (nslots class) (length slot-values)))
+  (let ((obj (make-object class)))
+    (replace (object-storage obj) slot-values)
+    obj))
+
+(defun of-user-class-p (object class)
+  (and (typep object 'object) (eq (object-class object) class)))
+
+(defun slot-access (object index)
+  (let ((storage (object-storage object)))
+    (assert (< index (length storage)))
+    (aref storage index)))
+
+(defun (setf slot-access) (new object index)
+  (let ((storage (object-storage object)))
+    (assert (< index (length storage)))
+    (setf (aref storage index) new)))

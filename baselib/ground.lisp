@@ -203,6 +203,21 @@
   (defapp set-cdr! (pair object) ignore ignore (rplacd pair object) i:inert)
   ;; symbols
   (defpred symbol? symbolp)
+  ;; objects
+  (defapp make-class (n) ignore ignore (make-instance 'i:user-class :nslots n))
+  (defapp construct (class &rest args) ignore ignore
+    (apply #'i:construct-user-object class args))
+  (defapp of-class? (object class) ignore ignore
+    (boolify (i:of-user-class-p object class)))
+  ;; the idea behind requiring classes here is to provide encapsulation.
+  ;; not sure this is the best design though
+  (defapp slot-read (class object n) ignore ignore
+    (assert (i:of-user-class-p object class))
+    (i:slot-access object n))
+  (defapp slot-write! (class object n value) ignore ignore
+    (assert (i:of-user-class-p object class))
+    (setf (i:slot-access object n) value)
+    i:inert)
   ;; equivalence
   (defapp eq? (object1 object2) ignore ignore (boolify (eql object1 object2)))
   ;; booleans

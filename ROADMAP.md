@@ -58,9 +58,9 @@ Anyway, quick TODO list, in no order:
   - X convenient macrology (e.g. once-only)
  - X macros
   - X expose to Burke
- - types
- - type definition
-  - generalize encapsulated types to hold multiple objects directly (more efficient i hope)
+ - types (in CL/optimizer sense, not data types)
+ - X type definition
+  - X generalize encapsulated types to hold multiple objects directly (more efficient i hope)
  - immutable conses?
 - conforming kernel option
  - circularity
@@ -83,7 +83,7 @@ Anyway, quick TODO list, in no order:
  - implement
  - integrate with generic functions
  - integrate with compilation environment?
-- niceties
+\- niceties
  - better error messages for ptree mismatch
  - better combiner names
 - VM

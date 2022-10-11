@@ -19,6 +19,7 @@
            #:make-uninitialized-fixed-environment #:initialize-fixed-environment
            #:make-immutable-environment #:copy-env-immutable)
   (:export #:make-cell #:cell-value)
+  (:export #:user-class #:construct-user-object #:of-user-class-p #:slot-access)
   (:export #:ptree-augmenter #:bind-ptree #:bind-ptree-to-vector)
   ;; Serialization
   (:export #:marshal #:marshal-to-file #:unmarshal #:unmarshal-from-file))
