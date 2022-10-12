@@ -1,7 +1,12 @@
+(defpackage #:burke/vm/class
+  (:use)
+  (:export #:cell #:cons #:boolean #:null #:applicative))
+
 (defpackage #:burke/vm
   (:use #:cl)
   (:local-nicknames (#:i #:burke/interpreter)
-                    (#:o #:burke/vm/ops))
+                    (#:o #:burke/vm/ops)
+                    (#:class #:burke/vm/class))
   (:export #:decode #:instruction-length)
   (:export #:module #:bytecode #:constants
            #:code #:closure #:enclose #:closed)

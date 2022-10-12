@@ -27,7 +27,8 @@
     :depends-on ("interpreter" "packages")
     :components ((:file "ops")
                  (:file "packages" :depends-on ("ops"))
-                 (:file "vm" :depends-on ("ops" "packages"))
+                 (:file "class" :depends-on ("packages"))
+                 (:file "vm" :depends-on ("ops" "class" "packages"))
                  (:file "asm" :depends-on ("vm" "packages"))
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
    (:module "treec"

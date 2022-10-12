@@ -69,7 +69,8 @@
          (declare (ignore eparam))
          ;; The dynenv is already argument 1, so we don't need much.
          (asm:assemble cfunction 'o:arg 1)
-         (when cellp (asm:assemble cfunction 'o:make-cell))
+         (when cellp (asm:assemble cfunction 'o:construct
+                       (asm:constant-index cfunction class:cell)))
          (asm:assemble cfunction 'o:set index)
          1))
    ;; local environment
@@ -98,51 +99,76 @@
 ;;; Return the number of new stack slots used.
 (defun gen-ptree (cfunction ptree locals)
   (etypecase ptree
-    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
+    (null (asm:assemble cfunction 'o:check-class
+            (asm:constant-index cfunction class:null))
+     0)
     (symbol (let ((local (assoc ptree locals)))
               (assert local)
-              (when (third local) (asm:assemble cfunction 'o:make-cell))
+              (when (third local)
+                (asm:assemble cfunction 'o:construct
+                  (asm:constant-index cfunction class:cell)))
               (asm:assemble cfunction 'o:set (second local)))
      0)
-    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
+    ((cons i:ignore i:ignore)
+     (asm:assemble cfunction 'o:check-class
+       (asm:constant-index cfunction class:cons))
+     1)
     ((cons i:ignore t)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup 'o:check-class ccons
+         'o:slot-read ccons 1))
      (max 1 (gen-ptree cfunction (cdr ptree) locals)))
     ((cons t i:ignore)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup 'o:check-class ccons
+         'o:slot-read ccons 0))
      (max 1 (gen-ptree cfunction (car ptree) locals)))
     (cons
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-     (let ((carstack (gen-ptree cfunction (car ptree) locals)))
-       (asm:assemble cfunction 'o:cdr)
-       (let ((cdrstack (gen-ptree cfunction (cdr ptree) locals)))
-         (max (+ 2 carstack) (+ 1 cdrstack)))))))
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup 'o:check-class ccons 'o:dup
+         'o:slot-read ccons 0)
+       (let ((carstack (gen-ptree cfunction (car ptree) locals)))
+         (asm:assemble cfunction 'o:slot-read ccons 1)
+         (let ((cdrstack (gen-ptree cfunction (cdr ptree) locals)))
+           (max (+ 2 carstack) (+ 1 cdrstack))))))))
 
 ;;; Like the above, but set variables rather than bind them anew.
 (defun set-ptree (cfunction ptree locals)
   (etypecase ptree
     (i:ignore (asm:assemble cfunction 'o:drop) 0)
-    (null (asm:assemble cfunction 'o:err-if-not-null) 0)
+    (null (asm:assemble cfunction 'o:check-class
+            (asm:constant-index cfunction class:null))
+     0)
     (symbol (let ((local (assoc ptree locals)))
               (assert local)
               (if (third local) ; cell
                   (asm:assemble cfunction
-                    'o:ref (second local) 'o:cell-set)
+                    'o:ref (second local)
+                    'o:slot-write (asm:constant-index cfunction class:cell) 0)
                   (asm:assemble cfunction 'o:set (second local))))
      0)
-    ((cons i:ignore i:ignore) (asm:assemble cfunction 'o:err-if-not-cons) 1)
+    ((cons i:ignore i:ignore)
+     (asm:assemble cfunction 'o:check-class
+       (asm:constant-index cfunction class:cons))
+     1)
     ((cons i:ignore t)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:cdr)
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup
+         'o:check-class ccons 'o:slot-read ccons 1))
      (max 1 (set-ptree cfunction (cdr ptree) locals)))
     ((cons t i:ignore)
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:car)
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup
+         'o:check-class ccons 'o:slot-read ccons 0))
      (max 1 (set-ptree cfunction (car ptree) locals)))
     (cons
-     (asm:assemble cfunction 'o:dup 'o:err-if-not-cons 'o:dup 'o:car)
-     (let ((carstack (set-ptree cfunction (car ptree) locals)))
-       (asm:assemble cfunction 'o:cdr)
-       (let ((cdrstack (set-ptree cfunction (cdr ptree) locals)))
-         (max (+ 2 carstack) (+ 1 cdrstack)))))))
+     (let ((ccons (asm:constant-index cfunction class:cons)))
+       (asm:assemble cfunction 'o:dup 'o:check-class ccons 'o:dup
+         'o:slot-read ccons 0)
+       (let ((carstack (set-ptree cfunction (car ptree) locals)))
+         (asm:assemble cfunction 'o:slot-read ccons 1)
+         (let ((cdrstack (set-ptree cfunction (cdr ptree) locals)))
+           (max (+ 2 carstack) (+ 1 cdrstack))))))))
 
 ;;; Generate code to parse arguments to the CEP. Returns stack used.
 ;;; The CEP receives arg0 = dynenv, arg1 = car of combinand, arg2 = cadr, etc.
@@ -165,9 +191,10 @@
                            (assert elocal)
                            (asm:assemble cfunction 'o:arg 0)
                            (when (third elocal) ; cell needed
-                            (asm:assemble cfunction 'o:make-cell))
-                          (asm:assemble cfunction 'o:set (second elocal))
-                          1))
+                             (asm:assemble cfunction 'o:construct
+                               (asm:constant-index cfunction class:cell)))
+                           (asm:assemble cfunction 'o:set (second elocal))
+                           1))
                  (i:ignore 0)))
              (ptstack (gen-cep-ptree cfunction ptree locals))
              (estack
@@ -202,7 +229,9 @@
      (let ((local (assoc ptree locals)))
        (assert local)
        (asm:assemble cfunction 'o:listify-args index)
-       (when (third local) (asm:assemble cfunction 'o:make-cell))
+       (when (third local)
+         (asm:assemble cfunction
+           'o:construct (asm:constant-index cfunction class:cell)))
        (asm:assemble cfunction 'o:set (second local))
        1))
     ((cons i:ignore t) ; don't care, move on without using stack

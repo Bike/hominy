@@ -26,13 +26,20 @@
   ;; an argspec can be either CONST or JUMP, and is a hint to the disassembler
   ;; on how to format the value. CONST means it's an index into the constants
   ;; and JUMP means it's a relative position.
-  (def (nop 0) (drop 0) (dup 0)
+  (def
+    ;; stack
+    (nop 0) (drop 0) (dup 0)
+    ;; variables
     (ref 1) (set 1) (closure 1 closure) (const 1 const)
+    ;; arguments
     (arg 1) (listify-args 1) (check-arg-count-= 1) (check-arg-count->= 1)
-    (make-cell 0) (cell-ref 0) (cell-set 0)
-    (cons 0) (list 1) (car 0) (cdr 0)
+    ;; control
     (return 0) (jump 1 jump) (jump-if-true 1 jump)
-    (combine 0) (tail-combine 0) (lookup 0) (unwrap 0) (wrap 0)
-    (enclose 1 const) (make-environment 1 const)
-    (call 1) (tail-call 1)
-    (err-if-not-cons 0) (err-if-not-null 0) (err-if-not-bool 0)))
+    ;; objects
+    (construct 1) (check-class 1) (slot-read 2) (slot-write 2)
+    ;; lists (should this be removed?)
+    (list 1)
+    ;; functions/calls
+    (combine 0) (tail-combine 0) ; remove these
+    (enclose 1 const) (make-environment 1 const) ; rethink?
+    (call 1) (tail-call 1)))

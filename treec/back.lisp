@@ -92,7 +92,8 @@
         (cf (cfunction context)))
     (cond ((not lpair) (asm:assemble cf 'o:closure (asm:closure-index cf symbol)))
           ((third lpair) ; cell
-           (asm:assemble cf 'o:ref (second lpair) 'o:cell-ref))
+           (asm:assemble cf 'o:ref (second lpair)
+             'o:slot-read (asm:constant-index cf class:cell) 0))
           (t (asm:assemble cf 'o:ref (second lpair))))))
 
 (defmethod translate ((node ref) context)
@@ -216,14 +217,14 @@
   (when (valuep context)
     (let ((cf (cfunction context)))
       (translate (applicative node) (context context :valuep t :tailp nil))
-      (asm:assemble cf 'o:unwrap)
+      (asm:assemble cf 'o:slot-read (asm:constant-index cf class:applicative) 0)
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
 (defmethod translate ((node wrap) context)
   (when (valuep context)
     (let ((cf (cfunction context)))
       (translate (unwrap node) (context context :valuep t :tailp nil))
-      (asm:assemble cf 'o:wrap)
+      (asm:assemble cf 'o:construct (asm:constant-index cf class:applicative))
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
 (defmethod translate ((node ifn) context)
@@ -233,7 +234,7 @@
          (mergel (unless tailp (asm:make-label)))
          (rcontext (context context :new-stack 1)))
     (translate (if-cond node) (context context :valuep t :tailp nil))
-    (asm:assemble cf 'o:dup 'o:err-if-not-bool)
+    (asm:assemble cf 'o:dup 'o:check-class (asm:constant-index cf class:boolean))
     (mark-stack (+ 2 (nstack context)))
     (asm:assemble cf 'o:jump-if-true thenl)
     (translate (else node) rcontext)
@@ -318,7 +319,7 @@
       (let ((eparam-info (assoc eparam new-locals)))
         (asm:assemble cf 'o:ref outer-env-index)
         (when (third eparam-info) ; cell
-          (asm:assemble cf 'o:make-cell))
+          (asm:assemble cf 'o:construct (asm:constant-index cf class:cell)))
         (asm:assemble cf 'o:set index))
       (incf estack))
     (when inner-envv ; haveta reify

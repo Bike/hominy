@@ -132,7 +132,9 @@
 ;;; Used for mutable bindings.
 ;;; These are not Burke objects, so it is not possible for an immutable environment
 ;;; to hold cells.
-(defstruct (cell (:constructor make-cell (value))) value)
+(defstruct (cell (:constructor make-cell (value))
+                 (:predicate cellp))
+  value)
 
 (defclass environment () ())
 
@@ -167,7 +169,7 @@ otherwise NIL NIL."))
 An environment with multiple parents is searched in depth-first order, as specified by Kernel.
 Signals an error if the symbol is not bound in the environment."
   (let ((cell (cell symbol environment)))
-    (if (cell-p cell)
+    (if (cellp cell)
         (cell-value cell)
         cell)))
 
@@ -176,7 +178,7 @@ Signals an error if the symbol is not bound in the environment."
 If the binding is immutable, an error is signaled.
 If the symbol is not already bound, an error is signaled. This function never creates new bindings."
   (let ((cell (cell symbol environment)))
-    (if (cell-p cell)
+    (if (cellp cell)
         (setf (cell-value cell) new)
         (error "Cannot modify immutable binding of ~a" symbol))))
 

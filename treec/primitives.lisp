@@ -2,8 +2,11 @@
 
 (defvar *primitives*
   (list
+   #+(or)
    (list (blookup 'syms::cons) 2 'o:cons)
+   #+(or)
    (list (blookup 'syms::car)  1 'o:car)
+   #+(or)
    (list (blookup 'syms::cdr)  1 'o:car)))
 
 (defun primitive (node)

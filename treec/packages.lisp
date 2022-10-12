@@ -8,5 +8,6 @@
                     (#:info #:burke/info)
                     (#:o #:burke/vm/ops)
                     (#:vm #:burke/vm)
+                    (#:class #:burke/vm/class)
                     (#:asm #:burke/vm/asm))
   (:export #:compile #:module))
