@@ -40,6 +40,5 @@
     ;; lists (should this be removed?)
     (list 1)
     ;; functions/calls
-    (combine 0) (tail-combine 0) ; remove these
     (enclose 1 const) (make-environment 1 const) ; rethink?
     (call 1) (tail-call 1)))

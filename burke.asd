@@ -32,7 +32,7 @@
                  (:file "asm" :depends-on ("vm" "packages"))
                  (:file "dis" :depends-on ("vm" "ops" "packages"))))
    (:module "treec"
-    :depends-on ("compilation-environment" "info" "vm" "interpreter")
+    :depends-on ("baselib" "compilation-environment" "info" "vm" "interpreter")
     :components ((:file "packages")
                  (:file "ptree" :depends-on ("packages"))
                  (:file "ir" :depends-on ("packages"))

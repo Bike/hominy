@@ -142,15 +142,6 @@
          (let ((class (constant (next-code))) (index (next-code)))
            (setf (slot-access class (spop) index) (spop)))
          (incf ip))
-        ((#.o:combine)
-         (let ((env (spop)) (combinand (spop)) (combiner (spop)))
-           (spush (i:combine combiner combinand env)))
-         (incf ip))
-        ((#.o:tail-combine)
-         ;; this isn't much of a tail combination - the lisp may not be smart enough
-         ;; to axe VM's stack frame before combining. FIXME
-         (let ((env (spop)) (combinand (spop)) (combiner (spop)))
-           (return-from vm (i:combine combiner combinand env))))
         ((#.o:enclose)
          (let ((code (constant (next-code))))
            (spush (enclose code (gather (nclosed code)))))
@@ -165,6 +156,8 @@
            (spush (apply #'i:call combiner frame args)))
          (incf ip))
         ((#.o:tail-call)
+         ;; this isn't much of a tail call - the lisp may not be smart enough
+         ;; to axe VM's stack frame before combining. FIXME
          (let ((args (gather (next-code))) (combiner (spop)))
            (return-from vm (apply #'i:call combiner frame args))))))))
 

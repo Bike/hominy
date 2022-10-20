@@ -186,11 +186,17 @@
       (t nil))))
 
 (defun translate-general-combination (node context)
-  (translate (combiner node) (context context :valuep t :tailp nil))
-  (translate (combinand node) (context context :valuep t :tailp nil :new-stack 1))
-  (translate (env node) (context context :valuep t :tailp nil :new-stack 2))
-  (asm:assemble (cfunction context) (if (tailp context) 'o:tail-combine 'o:combine))
-  (unless (valuep context) (asm:assemble (cfunction context) 'o:drop)))
+  ;; Call (unwrap combine). It's important to use standard combiners for this stuff,
+  ;; so that serialized modules can look them up.
+  (let ((cf (cfunction context))
+        ($combine (i:unwrap (i:lookup 'syms::combine baselib:*base*))))
+    (asm:assemble cf 'o:const (asm:constant-index cf $combine)
+      'o:const (asm:constant-index cf *empty-env*))
+    (translate (combiner node) (context context :valuep t :tailp nil :new-stack 2))
+    (translate (combinand node) (context context :valuep t :tailp nil :new-stack 3))
+    (translate (env node) (context context :valuep t :tailp nil :new-stack 4))
+    (asm:assemble cf (if (tailp context) 'o:tail-call 'o:call) 4)
+    (unless (valuep context) (asm:assemble cf 'o:drop))))
 
 (defmethod translate ((node seq) context)
   (loop with fecontext = (context context :valuep nil)
