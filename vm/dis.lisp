@@ -47,16 +47,20 @@
         when lab
           do (format t "~&~a:" (cdr lab))
         do (format t "~& ~a~{ ~d~}" (first dis) (rest dis))
-           ;; FIXME: Multiple operands
-           (case (fourth inst-info)
-             ((o:const)
-              (when constants (format t " ; ~a" (aref constants (second dis)))))
-             ((o:jump)
-              (let ((lab (assoc (+ pc (second dis)) labels)))
-                (when lab (format t " ; ~a" (cdr lab)))))
-             ((o:closure)
-              (when closed (format t " ; ~a" (aref closed (second dis))))))
-           (incf pc (1+ (third inst-info)))
+        when (some #'identity (cdddr inst-info)) ; special formatting
+          do (format t " ; ")
+             (loop for arg in (rest dis)
+                   for spec in (cdddr inst-info)
+                   do (ecase spec
+                        ((o:const)
+                         (when constants (format t "~s " (aref constants arg))))
+                        ((o:jump)
+                         (let ((lab (assoc (+ pc arg) labels)))
+                           (when lab (format t " ; ~a" (cdr lab)))))
+                        ((o:closure)
+                         (when closed (format t " ; ~a" (aref closed arg))))
+                        ((nil))))
+        do (incf pc (1+ (third inst-info)))
         until (>= pc end)))
 
 (defgeneric disassemble (object))

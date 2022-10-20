@@ -23,9 +23,10 @@
                     ,@(loop for (sym i) in map
                             collect `(defconstant ,sym ,i)))))))
   ;; Format is (name instruction-length argspecs...)
-  ;; an argspec can be either CONST or JUMP, and is a hint to the disassembler
-  ;; on how to format the value. CONST means it's an index into the constants
-  ;; and JUMP means it's a relative position.
+  ;; an argspec can be NIL, CONST, JUMP, or CLOSURE, and is a hint to the disassembler
+  ;; on how to format the value. CONST means it's an index into the constants,
+  ;; JUMP means it's a relative position, and CLOSURE a closure index.
+  ;; NIL, the default, means the disassembler should do nothing special.
   (def
     ;; stack
     (nop 0) (drop 0) (dup 0)
@@ -36,7 +37,7 @@
     ;; control
     (return 0) (jump 1 jump) (jump-if-true 1 jump)
     ;; objects
-    (construct 1) (check-class 1) (slot-read 2) (slot-write 2)
+    (construct 1 const) (check-class 1) (slot-read 2 const) (slot-write 2 const)
     ;; lists (should this be removed?)
     (list 1)
     ;; functions/calls
