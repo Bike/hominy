@@ -116,7 +116,6 @@
              (error "Argcount mismatch: Expected ~d, got ~d"
                     expected (length args))))
          (incf ip))
-        ((#.o:list) (spush (gather (next-code))) (incf ip))
         ((#.o:return) (return-from vm (spop)))
         ((#.o:jump) (incf ip (label)))
         ((#.o:jump-if-true)

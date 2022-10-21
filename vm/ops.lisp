@@ -38,8 +38,6 @@
     (return 0) (jump 1 jump) (jump-if-true 1 jump)
     ;; objects
     (construct 1 const) (check-class 1) (slot-read 2 const) (slot-write 2 const)
-    ;; lists (should this be removed?)
-    (list 1)
     ;; functions/calls
     (enclose 1 const) (make-environment 1 const) ; rethink?
     (call 1) (tail-call 1)))

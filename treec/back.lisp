@@ -213,10 +213,20 @@
              (mark-stack (1+ (nstack context)))
              (asm:assemble cf 'o:const (asm:constant-index cf ())))
             (t
-             (loop for i from 0 for node in elemnodes
-                   for ctx = (context context :new-stack i :valuep t :tailp nil)
-                   do (translate node ctx))
-             (asm:assemble cf 'o:list (length elemnodes))))
+             ;; FIXME: If we took advantage of the unspecified evaluation
+             ;; order we could build up the list backwards and use less
+             ;; stack space, but that wouldn't work with CONSTRUCT.
+             (let ((nelems (length elemnodes))
+                   (null (asm:constant-index cf ()))
+                   (cons (asm:constant-index cf class:cons)))
+               (loop for i from 0 for node in elemnodes
+                     for ctx = (context context :new-stack i
+                                                :valuep t :tailp nil)
+                     do (translate node ctx))
+               (asm:assemble cf 'o:const null)
+               (mark-stack (+ 1 nelems (nstack context)))
+               (loop repeat nelems
+                     do (asm:assemble cf 'o:construct cons)))))
       (when (tailp context) (asm:assemble cf 'o:return)))))
 
 (defmethod translate ((node unwrap) context)
