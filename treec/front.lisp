@@ -87,7 +87,7 @@
                              (or inner-reified-p (member eparam bfree)))))
     (make-instance 'letn
       :ptree (ptree combinern) :value combinandn
-      :dynenv-bind (if dynenv-bind-p eparam i:ignore)
+      :dynenv-bind (if dynenv-bind-p eparam nil)
       :inner-env-var (if inner-reified-p (env-var combinern) nil)
       ;; If we need to bind the dynenv, it's free.
       ;; This is true even if the operative doesn't need a reified static environment:
