@@ -4,7 +4,7 @@ First, I give a rigorous and detailed idea of what compilation and file compilat
 
 # Modules
 
-"module" is an informal term for an environment that presents a useful interface. As such there are no distinct module objects in Burke.
+"module" is an informal term for an environment that presents a useful interface. As such there are no distinct module objects in Hominy.
 
 However, for convenient specification of environments-as-modules, the `$module` operative is provided. `($module exports . bindings`) evaluates to an environment with the symbols in the exports list, and only those symbols, bound. The values are provided from the bindings, which are evaluated in the dynamic environment and may recursively refer to each other as in `$letrec`. The bindings may include symbols not in the exports list, which will be available for producing the module but will not be visible in the resulting environment.
 
@@ -90,7 +90,7 @@ Because macros can be expanded by the evaluator, they should be prepared to rece
 
 The compiler can only take advantage of macroexpansions if it knows about them, i.e. if the compilation environment includes the macro somehow, as by in a `constant-info`, possibly conveniently bound by `$clet`.
 
-(The semantics of macros in evaluated and compiled code are identical to promote the transparent compilation semantics. I don't think minimal compilation in the CL sense is actually all that useful in practice except I guess as motivation to make the compiler actually compile, but like, who puts side effects in macros anyway? Also, expanding all macros is impossible in Burke. `load-time-value` is genuinely different, but pretty marginal.)
+(The semantics of macros in evaluated and compiled code are identical to promote the transparent compilation semantics. I don't think minimal compilation in the CL sense is actually all that useful in practice except I guess as motivation to make the compiler actually compile, but like, who puts side effects in macros anyway? Also, expanding all macros is impossible in Hominy. `load-time-value` is genuinely different, but pretty marginal.)
 
 (I am not totally sure what a macro would do with the compilation environment, or for that matter the evaluation environment. Fancy macros could perhaps use type information and stuff, but that runs into similar problems to doing that with compiler macros in CL.)
 
@@ -98,13 +98,13 @@ The compiler can only take advantage of macroexpansions if it knows about them, 
 
 The operative `$compile-time-value` is treated differently by the evaluator and the compiler. To the evaluator, it is almost an identity: it could be defined by `($vau (form) #ignore (eval form (make-standard-environment)))`. The compiler (that is, with its standard info) however, may evaluate the form in the evaluation environment at compile time, and substitute the resulting value for the form.
 
-(I think Common Lisp's `load-time-value` versus `#.` isn't relevant to Burke, since essentially all objects should be serializable, and if you want side effects at load time please reconsider and also load-time-value is inappropriate. Sometimes people do use it like "static" locals in C - might be worth considering, I guess.)
+(I think Common Lisp's `load-time-value` versus `#.` isn't relevant to Hominy, since essentially all objects should be serializable, and if you want side effects at load time please reconsider and also load-time-value is inappropriate. Sometimes people do use it like "static" locals in C - might be worth considering, I guess.)
 
 ## Module Specification
 
 In practice, it is convenient to be able to be able to specify a module and a corresponding compilation environment in concert, to use a specified compilation environment for compiling the module itself, and to compile all code in a module at once rather than to go through every operative individually.
 
-This specification in Burke takes the form of a list of _directives_. A directive resembles a form, but is headed by a `_directive specifier_ rather than a combiner. `$cmodule` (or `directives->module` as an applicative, or `load-module` to read directives from a file) then interprets the directives to produce a module and compilation environment.
+This specification in Hominy takes the form of a list of _directives_. A directive resembles a form, but is headed by a `_directive specifier_ rather than a combiner. `$cmodule` (or `directives->module` as an applicative, or `load-module` to read directives from a file) then interprets the directives to produce a module and compilation environment.
 
 Directives are of type `directive?` and include e.g. `define`, `inline`, `defmacro`, `directive-macrolet`, `define-directive-macro`, something something more later.
 
@@ -114,13 +114,13 @@ Like, importing modules. Having a module specify its requirements. TODO
 
 # Marshaling
 
-With few exceptions (continuations are the only standard thing I can think of, but that could be doable), all objects in Burke can be _marshaled_ and then _unmarshaled_ to form _similar_ objects. Marshaling is the process of serializing objects into sequences which can be e.g. written to files, and unmarshaling the process of deserializing them back into objects. The standard requires a marshaling format using eight-bit bytes, but other formats may be provided by implementations.
+With few exceptions (continuations are the only standard thing I can think of, but that could be doable), all objects in Hominy can be _marshaled_ and then _unmarshaled_ to form _similar_ objects. Marshaling is the process of serializing objects into sequences which can be e.g. written to files, and unmarshaling the process of deserializing them back into objects. The standard requires a marshaling format using eight-bit bytes, but other formats may be provided by implementations.
 
 Marshaling and unmarshaling can be modified by linking. Linking allows some objects accessible in the original marshaling context to be replaced in the later unmarshaled object by counterparts in the unmarshaling context, outside the unmarshaled object.
 
 ## Similarity
 
-In order to rigorously define what marshaling does, a _similarity_ predicate is defined. Similarity is not an accessible applicative because it may apply to objects in different Burke images, and is in general uncomputable as described below. Unmarshaling a marshaled object produces an object that is _similar_ to the original, but not necessarily `eq?` or `equal?`, even if these processes took place in the same image. Similarity is intended to be strictly defined enough that most uses of an object will behave identically, and roughly speaking, similar objects will be about `equal?`.
+In order to rigorously define what marshaling does, a _similarity_ predicate is defined. Similarity is not an accessible applicative because it may apply to objects in different Hominy images, and is in general uncomputable as described below. Unmarshaling a marshaled object produces an object that is _similar_ to the original, but not necessarily `eq?` or `equal?`, even if these processes took place in the same image. Similarity is intended to be strictly defined enough that most uses of an object will behave identically, and roughly speaking, similar objects will be about `equal?`.
 
 (Kernel defines `equal?` in terms of external representations. In my view, this is lazy and should not be done.)
 

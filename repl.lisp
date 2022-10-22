@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:hominy)
 
 (defun read-\#i (stream dispchar num)
   (declare (cl:ignore dispchar num))
@@ -25,7 +25,7 @@
   (set-dispatch-macro-character #\# #\f #'read-#f readtable)
   (values))
 
-(defvar *burke-readtable*
+(defvar *hominy-readtable*
   (let ((rt (copy-readtable nil)))
     (install-reader-macros rt)
     rt))
@@ -35,26 +35,26 @@
   (declare (sb-ext:muffle-conditions style-warning)) ; &optional and &key complaint
   (defun read-from-string (string &optional (eof-error-p t) eof-value
                            &key (start 0) end preserve-whitespace)
-    (let ((*readtable* *burke-readtable*)
+    (let ((*readtable* *hominy-readtable*)
           (*package* (find-package "BURKE/INTERPRETER/SYMS")))
       (cl:read-from-string string eof-error-p eof-value
                            :start start :end end
                            :preserve-whitespace preserve-whitespace))))
 
 (defun read (&optional (stream *standard-input*) (eof-error-p t) eof-value recursivep)
-  (let ((*readtable* *burke-readtable*)
+  (let ((*readtable* *hominy-readtable*)
         (*package* (find-package "BURKE/INTERPRETER/SYMS")))
     (cl:read stream eof-error-p eof-value recursivep)))
 
 (defun repl (&key (modules nil))
-  (let* ((*readtable* *burke-readtable*)
+  (let* ((*readtable* *hominy-readtable*)
          (*package* (find-package "BURKE/INTERPRETER/SYMS"))
          (repl-env (apply #'i:make-environment baselib:*base* modules)))
     ;; KLUDGE
-    (i:define baselib:*basec* 'burke/interpreter/syms::compilation-environment
+    (i:define baselib:*basec* 'hominy/interpreter/syms::compilation-environment
       repl-env)
     (catch 'abort
-      (with-simple-restart (abort "Abort the Burke REPL.")
-        (loop (with-simple-restart (continue "Return to the Burke REPL.")
+      (with-simple-restart (abort "Abort the Hominy REPL.")
+        (loop (with-simple-restart (continue "Return to the Hominy REPL.")
                 (format t "~&> ")
                 (format t "~&~:a~%" (i:eval (read) repl-env))))))))

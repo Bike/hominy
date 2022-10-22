@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;; Convert an operation where the combinand is known constant.
 ;;; This is useful for basic operatives like $if, etc., that usually have constant combinands.

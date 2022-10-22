@@ -1,4 +1,4 @@
-(in-package #:burke/vm)
+(in-package #:hominy/vm)
 
 (defgeneric construct (class &rest arguments))
 (defgeneric of-class-p (object class)

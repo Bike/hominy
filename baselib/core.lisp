@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 ;;; Define a "core" environment. This contains definitions for parts of the standard library
 ;;; that are pretty intrinsic to the semantics of the language, versus modules, which while

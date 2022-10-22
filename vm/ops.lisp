@@ -1,15 +1,15 @@
-(cl:in-package #:burke)
+(cl:in-package #:hominy)
 
 (macrolet ((def (&rest ops)
              (let ((map (loop for (op len . argspec) in ops for i from 0
                               collect (list* (symbol-name op) i len
                                              (mapcar #'symbol-name argspec)))))
                `(progn
-                  (defpackage #:burke/vm/ops
+                  (defpackage #:hominy/vm/ops
                     (:use)
                     (:export "*OPS*")
                     (:export ,@(mapcar #'car map)))
-                  (in-package #:burke/vm/ops)
+                  (in-package #:hominy/vm/ops)
                   ;; Expansion delayed until the package is actually defined
                   (dmap ,map))))
            (dmap (map)

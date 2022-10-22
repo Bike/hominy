@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 ;;; Kernel has a couple impedance mismatches with CL here.
 ;;; In particular I have not really looked at "inexact" numbers much.

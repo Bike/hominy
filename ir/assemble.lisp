@@ -1,4 +1,4 @@
-(in-package #:burke/ir)
+(in-package #:hominy/ir)
 
 ;;; Assembly is a syntax for building continuations and whole functions in a
 ;;; hopefully reasonably simple way.

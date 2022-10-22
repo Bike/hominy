@@ -1,4 +1,4 @@
-(defpackage #:burke/type
+(defpackage #:hominy/type
   (:use #:cl)
   (:shadow #:type #:cons #:list
            #:typep #:subtypep #:car #:cdr #:symbol
@@ -12,9 +12,9 @@
            #:unparse)
   (:export #:lookup))
 
-(defpackage #:burke/info
+(defpackage #:hominy/info
   (:use #:cl)
-  (:local-nicknames (#:type #:burke/type))
+  (:local-nicknames (#:type #:hominy/type))
   (:shadow #:type)
   (:export #:info #:default-info
            #:join/2 #:meet/2 #:subinfop)
@@ -26,19 +26,19 @@
            #:constant)
   (:export #:type))
 
-(defpackage #:burke/cenv
+(defpackage #:hominy/cenv
   (:use #:cl)
-  (:local-nicknames (#:info #:burke/info)
-                    (#:i #:burke/interpreter))
+  (:local-nicknames (#:info #:hominy/info)
+                    (#:i #:hominy/interpreter))
   (:export #:binding #:info)
   (:export #:cenvironment #:empty-cenv #:make-cenv #:augment1 #:lookup))
 
-(defpackage #:burke/baselib
+(defpackage #:hominy/baselib
   (:use #:cl)
-  (:local-nicknames (#:i #:burke/interpreter)
-                    (#:syms #:burke/interpreter/syms)
-                    (#:info #:burke/info)
-                    (#:cenv #:burke/cenv))
+  (:local-nicknames (#:i #:hominy/interpreter)
+                    (#:syms #:hominy/interpreter/syms)
+                    (#:info #:hominy/info)
+                    (#:cenv #:hominy/cenv))
   ;; Environment definition stuff
   (:export #:defenv #:*defining-environment*
            #:defop #:defapp #:defmac #:boolify #:defpred)
@@ -49,9 +49,9 @@
   ;; Ultimate products
   (:export #:*base* #:*basec*))
 
-(defpackage #:burke/ir
+(defpackage #:hominy/ir
   (:use #:cl)
-  (:local-nicknames (#:info #:burke/info))
+  (:local-nicknames (#:info #:hominy/info))
   (:shadow #:cons #:car #:cdr #:continue #:function #:inline #:eval #:sequence
            #:disassemble)
   (:export #:datum #:name #:map-users #:map-uses #:unusedp)
@@ -82,17 +82,17 @@
   ;; Verification
   (:export #:verify))
 
-(defpackage #:burke/flow
+(defpackage #:hominy/flow
   (:use #:cl)
-  (:local-nicknames (#:info #:burke/info)
-                    (#:ir #:burke/ir)
-                    (#:type #:burke/type))
+  (:local-nicknames (#:info #:hominy/info)
+                    (#:ir #:hominy/ir)
+                    (#:type #:hominy/type))
   (:export #:forward-propagate-datum))
 
-(defpackage #:burke
+(defpackage #:hominy
   (:use #:cl)
   (:shadow #:read #:read-from-string)
-  (:local-nicknames (#:i #:burke/interpreter)
-                    (#:baselib #:burke/baselib))
+  (:local-nicknames (#:i #:hominy/interpreter)
+                    (#:baselib #:hominy/baselib))
   (:export #:repl)
   (:export #:read #:read-from-string))

@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:hominy)
 
 (defvar *dis* nil)
 
@@ -7,30 +7,30 @@
 ;;;  that cannot be dumped.)
 
 (defun %operative-ir (enclosed)
-  (let* ((einf (make-instance 'burke/info:info :type (burke/type:member enclosed)))
-         (module (make-instance 'burke/ir:module))
+  (let* ((einf (make-instance 'hominy/info:info :type (hominy/type:member enclosed)))
+         (module (make-instance 'hominy/ir:module))
          (cf (fresh-function)))
-    (burke/ir:add-function module cf)
+    (hominy/ir:add-function module cf)
     (optimize-function cf einf)
-    (burke/ir:verify module)
+    (hominy/ir:verify module)
     cf))
 
 (defun $cvau (static-env ptree eparam &rest body)
   (let* ((enclosed (list* static-env ptree eparam body))
          (ir (%operative-ir enclosed))
-         (module (burke/ir:module ir)))
-    (when *dis* (format t "~&~a~%" (burke/ir:disassemble module)))
-    (burke/ir:verify module)
+         (module (hominy/ir:module ir)))
+    (when *dis* (format t "~&~a~%" (hominy/ir:disassemble module)))
+    (hominy/ir:verify module)
     (let* ((cls (ir2cl ir))
            (f (compile nil cls)))
       (make-instance 'compiled-operative :fun f :enclosed enclosed))))
 
 (defun compilation-module ()
-  "Return a Burke environment with bindings for the flow compiler."
+  "Return a Hominy environment with bindings for the flow compiler."
   ;; called "module" instead of "environment" because a compilation environment
   ;; is something different.
   (i:make-fixed-environment
-   '(burke/interpreter/syms::$cvau)
+   '(hominy/interpreter/syms::$cvau)
    (list (i:make-builtin-operative
           (lambda (env combinand) (apply #'$cvau env combinand))))))
 

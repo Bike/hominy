@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;; Handling for when the compiler needs to evaluate something, e.g. to resolve
 ;;; constants or to expand macros.

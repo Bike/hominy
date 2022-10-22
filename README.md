@@ -2,17 +2,17 @@ This is an implementation of a language resembling [https://web.cs.wpi.edu/~jshu
 
 # How to use
 
-Load the `burke` system. Call `(burke:repl)` to get a Burke REPL with the base library, which includes some of the operatives etc. in the Kernel report and some other stuff also, which is not fully documented. As of this writing, the parts of the Kernel report implemented are most of the "core library features", as well as a version of keyed static variables. Use `(exit)` to exit the REPL.
+Load the `hominy` system. Call `(hominy:repl)` to get a Hominy REPL with the base library, which includes some of the operatives etc. in the Kernel report and some other stuff also, which is not fully documented. As of this writing, the parts of the Kernel report implemented are most of the "core library features", as well as a version of keyed static variables. Use `(exit)` to exit the REPL.
 
-`burke:read`, `burke:read-from-string`, `burke/interpreter:eval`, `burke/interpreter:lookup`, and `burke/interpreter:combine` can be employed together to execute Burke code from within the host Lisp REPL.
+`hominy:read`, `hominy:read-from-string`, `hominy/interpreter:eval`, `hominy/interpreter:lookup`, and `hominy/interpreter:combine` can be employed together to execute Hominy code from within the host Lisp REPL.
 
 ## The compiler
 
 So far only the "tree" compiler is remotely operable. It can do some basic optimizations like avoiding consing environments in basic cases, reducing combinations of basic operatives like `$let` or `$if`, etc.
 
-To use it, try `(burke:repl :modules (list (burke/cenv:module) (burke/treec:module)))`. Then you will be able to use the `compile` applicative and the `standard-compilation-environment`. To compile a combiner, do `(compile combiner-goes-here standard-compilation-environment)` and you will get a compiled combiner back.
+To use it, try `(hominy:repl :modules (list (hominy/cenv:module) (hominy/treec:module)))`. Then you will be able to use the `compile` applicative and the `standard-compilation-environment`. To compile a combiner, do `(compile combiner-goes-here standard-compilation-environment)` and you will get a compiled combiner back.
 
-For now the only real target for Burke is a VM.
+For now the only real target for Hominy is a VM.
 
 # What is this?
 
@@ -195,7 +195,7 @@ Congratulations on being one of the like twelve human beings who actually know a
 
 Yeah I have a few issues with Kernel's design. The big ones are as follows:
 
-* Environment mutation: In Burke, you cannot _add bindings to_ environments created by `$vau` (but the toplevel REPL environment and `make-environment` are ok).
+* Environment mutation: In Hominy, you cannot _add bindings to_ environments created by `$vau` (but the toplevel REPL environment and `make-environment` are ok).
   * Modifying existing bindings is one thing. Dr. Shutt went through some effort to avoid chaos - defining `$define!` to not modify bindings in parent environments - in an attempt to keep things reasonable. But he failed, because you can still _add_ bindings all over the dang place. Consider `($lambda (f x) ($sequence (call f x) ($if ...)))`: without further information, the compiler must assume that `f` could add a local binding for `$if` to the lambda environment, and so it couldn't compile the `$if` form at all. Ridiculous. Dr. Shutt lifted Scheme's "define as short for letrec" thing into doing actual mutation, but geez, letrec is just so much cleaner.
 * Circular lists: I don't care. Supporting circular lists in `$let` or something is weird but okay. But the amount of effort put into `map` and `reduce` for example is just silly.
 * Continuations: I do intend to implement some kind of continuations eventually; at the very least escape continuations, maybe delimited continuations since they're interesting, maybe full on `call/cc`.

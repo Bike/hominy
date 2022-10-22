@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:hominy)
 
 ;;;; This file defines stuff compiled code uses/depends on.
 ;;;; It will get more complicated once representation selection allows

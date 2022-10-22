@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 (defun %compile (ptree eparam body cenvironment environment)
   (let* ((static-env-var (gensym "EXTERNAL-ENVIRONMENT"))
@@ -28,7 +28,7 @@
     (i:combiner combiner)))
 
 (defun module ()
-  "Return a Burke environment with bindings for the tree compiler."
+  "Return a Hominy environment with bindings for the tree compiler."
   (i:make-fixed-environment
    '(syms::compile)
    (list (i:wrap (i:make-builtin-operative

@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;; Return a list of symbols in the ptree, depth first car to cdr.
 (defun ptree-symbols (ptree)

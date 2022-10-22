@@ -1,9 +1,9 @@
-(in-package #:burke/interpreter)
+(in-package #:hominy/interpreter)
 
 ;;;; Operators for dealing with ptrees. Plists, or "parameter lists", are how
-;;;; Burke binds things. For example, the parameters to a function, or the
+;;;; Hominy binds things. For example, the parameters to a function, or the
 ;;;; bindings in a $let, are ptrees.
-;;;; Burke ptrees are mostly like Kernel ptrees, except that they must not be
+;;;; Hominy ptrees are mostly like Kernel ptrees, except that they must not be
 ;;;; circular/self referential.
 ;;;; A ptree can be either ignore, (), a symbol, or a cons of ptrees.
 ;;;; IGNORE binds nothing. The value is ignored.

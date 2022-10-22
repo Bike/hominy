@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 ;;;; This file defines Kernel's keyed static variables.
 ;;;; These are like symbols, in that they can be bound. They are unlike symbols in that

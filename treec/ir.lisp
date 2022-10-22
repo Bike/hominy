@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;; Abstract class for IR for a form.
 (defclass node () ())

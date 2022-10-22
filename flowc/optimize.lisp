@@ -1,87 +1,87 @@
-(in-package #:burke)
+(in-package #:hominy)
 
 (defun constant-type-p (type)
-  (and (typep type 'burke/type:member)
-       (= (length (burke/type:elements type)) 1)))
+  (and (typep type 'hominy/type:member)
+       (= (length (hominy/type:elements type)) 1)))
 
 (defun constant-type-value (type)
-  (first (burke/type:elements type)))
+  (first (hominy/type:elements type)))
 
 (defun constant-propagate-function (function)
-  (let ((module (burke/ir:module function)))
-    (burke/ir:map-instructions
+  (let ((module (hominy/ir:module function)))
+    (hominy/ir:map-instructions
      (lambda (inst)
-       (loop for use in (burke/ir:uinputs inst)
-             for info = (burke/ir:info use)
-             for type = (burke/info:type info)
+       (loop for use in (hominy/ir:uinputs inst)
+             for info = (hominy/ir:info use)
+             for type = (hominy/info:type info)
              when (and (constant-type-p type)
-                       (not (typep (burke/ir:definition use) 'burke/ir:constant)))
-               do (setf (burke/ir:definition use)
-                        (burke/ir:constant (constant-type-value type) module))))
+                       (not (typep (hominy/ir:definition use) 'hominy/ir:constant)))
+               do (setf (hominy/ir:definition use)
+                        (hominy/ir:constant (constant-type-value type) module))))
      function)))
 
 (defun constant-propagate (module)
-  (burke/ir:map-functions #'constant-propagate-function module))
+  (hominy/ir:map-functions #'constant-propagate-function module))
 
 (defgeneric maybe-replace-instruction (instruction)
-  (:method ((inst burke/ir:instruction))))
+  (:method ((inst hominy/ir:instruction))))
 
-(defmethod maybe-replace-instruction ((inst burke/ir:sequence))
-  (let* ((uins (burke/ir:uinputs inst))
-         (continuation (burke/ir:definition (first uins)))
-         (env (burke/ir:definition (third uins)))
+(defmethod maybe-replace-instruction ((inst hominy/ir:sequence))
+  (let* ((uins (hominy/ir:uinputs inst))
+         (continuation (hominy/ir:definition (first uins)))
+         (env (hominy/ir:definition (third uins)))
          (formsu (second uins))
-         (forms (burke/ir:definition formsu))
-         (formsinfo (burke/ir:info formsu))
-         (formstype (burke/info:type formsinfo))
-         (null (burke/type:member nil))
-         (top (burke/type:top))
-         (list1 (burke/type:cons top null)))
-    (cond ((burke/type:subtypep formstype list1)
+         (forms (hominy/ir:definition formsu))
+         (formsinfo (hominy/ir:info formsu))
+         (formstype (hominy/info:type formsinfo))
+         (null (hominy/type:member nil))
+         (top (hominy/type:top))
+         (list1 (hominy/type:cons top null)))
+    (cond ((hominy/type:subtypep formstype list1)
            ;; ($sequence foo)
-           (burke/ir:replace-terminator inst
-               (burke/ir:eval continuation (burke/ir:car forms) env))
+           (hominy/ir:replace-terminator inst
+               (hominy/ir:eval continuation (hominy/ir:car forms) env))
            t)
-          ((burke/type:subtypep formstype null)
+          ((hominy/type:subtypep formstype null)
            ;; ($sequence)
-           (burke/ir:replace-terminator inst
-               (burke/ir:continue continuation 'i:inert))
+           (hominy/ir:replace-terminator inst
+               (hominy/ir:continue continuation 'i:inert))
            t)
           (t nil))))
 
-(defmethod maybe-replace-instruction ((inst burke/ir:eval))
-  (let* ((uins (burke/ir:uinputs inst))
-         (continuation (burke/ir:definition (first uins)))
-         (env (burke/ir:definition (third uins)))
+(defmethod maybe-replace-instruction ((inst hominy/ir:eval))
+  (let* ((uins (hominy/ir:uinputs inst))
+         (continuation (hominy/ir:definition (first uins)))
+         (env (hominy/ir:definition (third uins)))
          (formu (second uins))
-         (form (burke/ir:definition formu))
-         (forminfo (burke/ir:info formu))
-         (formtype (burke/info:type forminfo))
-         (symbol (burke/type:symbol))
-         (top (burke/type:top))
-         (cons (burke/type:cons top top)))
+         (form (hominy/ir:definition formu))
+         (forminfo (hominy/ir:info formu))
+         (formtype (hominy/info:type forminfo))
+         (symbol (hominy/type:symbol))
+         (top (hominy/type:top))
+         (cons (hominy/type:cons top top)))
     ;; TODO: Self evaluating objects
-    (cond ((burke/type:subtypep formtype symbol)
-           (burke/ir:replace-terminator inst
-               (burke/ir:continue continuation (burke/ir:lookup form env)))
+    (cond ((hominy/type:subtypep formtype symbol)
+           (hominy/ir:replace-terminator inst
+               (hominy/ir:continue continuation (hominy/ir:lookup form env)))
            t)
-          ((burke/type:subtypep formtype cons)
-           (let* ((evalcont (burke/ir:continuation inst))
+          ((hominy/type:subtypep formtype cons)
+           (let* ((evalcont (hominy/ir:continuation inst))
                   (combcont
-                    (burke/ir:assemble-continuation combine (combiner) evalcont
+                    (hominy/ir:assemble-continuation combine (combiner) evalcont
                         ()
-                      (burke/ir:combination continuation combiner
-                                      (burke/ir:cons (burke/ir:cdr form) env)))))
-             (burke/ir:replace-terminator inst
-                 (burke/ir:eval combcont (burke/ir:car form) env))
+                      (hominy/ir:combination continuation combiner
+                                      (hominy/ir:cons (hominy/ir:cdr form) env)))))
+             (hominy/ir:replace-terminator inst
+                 (hominy/ir:eval combcont (hominy/ir:car form) env))
              t))
           (t nil))))
 
 (defun optimize-function (function enclosed-info)
   (tagbody
    loop
-     (burke/flow:forward-propagate-datum (burke/ir:enclosed function) enclosed-info)
-     (burke/ir:map-instructions
+     (hominy/flow:forward-propagate-datum (hominy/ir:enclosed function) enclosed-info)
+     (hominy/ir:map-instructions
       (lambda (inst)
         (when (maybe-replace-instruction inst)
           (go loop)))

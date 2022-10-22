@@ -1,4 +1,4 @@
-(in-package #:burke/ir)
+(in-package #:hominy/ir)
 
 ;;;; CPS-based IR; see "compiling with continuations, continued" for intro
 ;;;; This is basically and obviously equivalent to SSA, where continuing is

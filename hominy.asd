@@ -1,4 +1,4 @@
-(defsystem :burke
+(defsystem :hominy
   :depends-on (#+(or):cl-conspack :trivial-garbage)
   :components
   ((:module "interpreter"

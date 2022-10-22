@@ -1,4 +1,4 @@
-(in-package #:burke/interpreter)
+(in-package #:hominy/interpreter)
 
 (cpk:defencoding regular-environment %parents %table)
 (cpk:defencoding fixed-environment %parents %names %vvec)

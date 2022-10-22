@@ -1,8 +1,8 @@
-(in-package #:burke/vm/asm)
+(in-package #:hominy/vm/asm)
 
 (defun disassemble-instruction (bytecode ip)
   (let* ((byte (aref bytecode ip))
-         (info (burke/vm:decode byte)))
+         (info (hominy/vm:decode byte)))
     (unless info (error "Unknown opcode ~d" byte))
     (cons (car info)
           (loop for i from 0 below (third info)
@@ -20,7 +20,7 @@
   (declare (optimize debug))
   (loop with pc = start
         with labels = '()
-        for (name byte size . args) = (burke/vm:decode (aref bytecode pc))
+        for (name byte size . args) = (hominy/vm:decode (aref bytecode pc))
         do (loop for i from 0 below size
                  for arg = (nth i args)
                  for raw = (aref bytecode (+ pc i 1))
@@ -41,7 +41,7 @@
   (format t "~&---disassembly---~%")
   (loop with pc = start
         with labels = (collect-labels bytecode :start start :end end)
-        for inst-info = (burke/vm:decode (aref bytecode pc))
+        for inst-info = (hominy/vm:decode (aref bytecode pc))
         for dis = (disassemble-instruction bytecode pc)
         for lab = (assoc pc labels)
         when lab
@@ -68,29 +68,29 @@
 (defmethod disassemble ((obj vm:module))
   ;; TODO: Print closure variables from each function individually.
   ;; (And, really, break up the disassembly into functions.)
-  (disassemble-bytecode (burke/vm:bytecode obj)
-                        :constants (burke/vm:constants obj)))
+  (disassemble-bytecode (hominy/vm:bytecode obj)
+                        :constants (hominy/vm:constants obj)))
 
 (defmethod disassemble ((obj vm:closure)) (disassemble (vm:code obj)))
 
 (defmethod disassemble ((obj vm:code))
-  (let ((mod (burke/vm:module obj)))
-    (disassemble-bytecode (burke/vm:bytecode mod)
-                          :constants (burke/vm:constants mod)
-                          :closed (burke/vm:closed obj)
+  (let ((mod (hominy/vm:module obj)))
+    (disassemble-bytecode (hominy/vm:bytecode mod)
+                          :constants (hominy/vm:constants mod)
+                          :closed (hominy/vm:closed obj)
                           :start (vm:gep obj)
                           :end (vm:end obj))))
 
-(defmethod disassemble ((obj burke/interpreter:applicative))
-  (disassemble (burke/interpreter:unwrap obj)))
+(defmethod disassemble ((obj hominy/interpreter:applicative))
+  (disassemble (hominy/interpreter:unwrap obj)))
 
 (defun module ()
-  (burke/interpreter:make-fixed-environment
-   '(burke/interpreter/syms::disassemble)
-   (list (burke/interpreter:wrap
-          (burke/interpreter:make-builtin-operative
+  (hominy/interpreter:make-fixed-environment
+   '(hominy/interpreter/syms::disassemble)
+   (list (hominy/interpreter:wrap
+          (hominy/interpreter:make-builtin-operative
            (lambda (env frame combinand)
              (declare (ignore env frame))
              (destructuring-bind (combiner) combinand
                (disassemble combiner)
-               burke/interpreter:inert)))))))
+               hominy/interpreter:inert)))))))

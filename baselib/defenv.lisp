@@ -1,6 +1,6 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
-;;; Facility for defining Burke environments full of combiners implemented in Lisp.
+;;; Facility for defining Hominy environments full of combiners implemented in Lisp.
 
 (defmacro defenv (name (&rest parents) &body body)
   (if (symbolp name)
@@ -21,7 +21,7 @@
      (values (i:copy-env-immutable *defining-environment*)
              (apply #'cenv:make-cenv nil t *defining-compilation-bindings*))))
 
-;;; Define a Lisp function that can be used as the function of a builtin Burke operative,
+;;; Define a Lisp function that can be used as the function of a builtin Hominy operative,
 ;;; i.e. it takes three arguments: the dynenv, the parent frame, and the combinand.
 ;;; You can't declare things for the eparam or fparam, but if they're IGNORE they
 ;;; are ignored. Dag.
@@ -36,12 +36,12 @@
 
 (defun isymify (symbol) (intern (symbol-name symbol) "BURKE/INTERPRETER/SYMS"))
 
-(defmacro burke-operative (name lambda-list eparam fparam &body body)
+(defmacro hominy-operative (name lambda-list eparam fparam &body body)
   `(i:make-builtin-operative
     (blambda ,lambda-list ,eparam ,fparam ,@body) ',(isymify name)))
 
 (defmacro defop (name lambda-list eparam fparam &body body)
-  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+  `(let ((op (hominy-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
      (i:define op ',(isymify name) *defining-environment*)
      (push (cons ',(isymify name)
                  (make-instance 'cenv:binding
@@ -51,7 +51,7 @@
            *defining-compilation-bindings*)))
 
 (defmacro defapp (name lambda-list eparam fparam &body body)
-  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+  `(let ((op (hominy-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
      (i:define (i:wrap op) ',(isymify name) *defining-environment*)
      (push (cons ',(isymify name)
                  (make-instance 'cenv:binding
@@ -61,7 +61,7 @@
                             :value op))))
            *defining-compilation-bindings*)))
 
-;;; Convert a Lisp boolean to a Burke one.
+;;; Convert a Lisp boolean to a Hominy one.
 (defun boolify (object) (if object i:true i:false))
 
 ;;; Convenience: Define a type predicate.
@@ -69,7 +69,7 @@
   `(defapp ,name (object) ignore ignore (boolify (,lisp-name object))))
 
 (defmacro defmac (name lambda-list eparam fparam &body body)
-  `(let ((op (burke-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
+  `(let ((op (hominy-operative ,name ,lambda-list ,eparam ,fparam ,@body)))
      (i:define (make-macro op) ',(isymify name) *defining-environment*)
      (push (cons ',(isymify name)
                  (make-instance 'cenv:binding

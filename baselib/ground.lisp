@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -57,7 +57,7 @@
 
 ;;; We actually account for circularity here for old time's sake.
 ;;; And because it's consing anyway, so who cares about consing up a table too?
-;;; Besides exposing this function to Burke, we also use it to copy ptrees and $vau bodies
+;;; Besides exposing this function to Hominy, we also use it to copy ptrees and $vau bodies
 ;;; and stuff, like Kernel does. Prevents programmers from doing goofy bullshit.
 ;;; In Kernel the copy's immutable, which would also be good for that (and does matter
 ;;; because the programmer could in some situations get at the substructures) but we

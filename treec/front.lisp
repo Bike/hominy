@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;;; Produce IR from source forms.
 
@@ -155,7 +155,7 @@
 (defun expand-macro (expander combinand)
   (multiple-value-bind (expansion error)
       ;; FIXME: IGNORE-ERRORS may not be ideal
-      ;; wrt NLX within burke.
+      ;; wrt NLX within hominy.
       (ignore-errors (ctcombine expander combinand))
     (cond (error
            (warn "~a while macroexpanding: ~a" 'error error)

@@ -1,4 +1,4 @@
-(in-package #:burke/ir)
+(in-package #:hominy/ir)
 
 (defgeneric verify (ir)
   (:method-combination progn))

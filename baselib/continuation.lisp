@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 (defclass catch-tag ()
   ((%name :initform nil :initarg :name :reader name)

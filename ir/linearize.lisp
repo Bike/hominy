@@ -1,4 +1,4 @@
-(in-package #:burke/ir)
+(in-package #:hominy/ir)
 
 ;;;; NOTE: Won't work if there are circular dependencies.
 

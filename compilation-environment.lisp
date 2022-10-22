@@ -1,4 +1,4 @@
-(in-package #:burke/cenv)
+(in-package #:hominy/cenv)
 
 ;;; Info about a variable binding.
 ;;; This is an object instead of just the info because compilers may

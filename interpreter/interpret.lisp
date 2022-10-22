@@ -1,4 +1,4 @@
-(in-package #:burke/interpreter)
+(in-package #:hominy/interpreter)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass ignore () ()))
@@ -65,14 +65,14 @@
 
 ;;; Implementation-wise, rather than the usual Scheme interpreter that relies
 ;;; on the host being tail-recursive and always invokes the continuation
-;;; rather than returning normally, we represent Burke control flow as CL
+;;; rather than returning normally, we represent Hominy control flow as CL
 ;;; control flow, i.e. we just return normally and stuff. When we want to
 ;;; abort, we cl:throw. When we want to extend, which CL of course cannot do,
 ;;; we use a generic function CONTINUE, which performs all the actions in the
 ;;; accumulated frames. We also mark in the CL dynamic environment where the
 ;;; extension ends, at which point continue stops tail calling itself and just
 ;;; returns normally (this cannot be indicated in the frames themselves, which
-;;; need to reflect the Burke frames).
+;;; need to reflect the Hominy frames).
 
 ;;; Frames allocated during normal evaluation are on the stack. When the code
 ;;; constructs a delimited continuation, the stack frames are copied into the
@@ -130,7 +130,7 @@
 ;;; want you can get the same effect by making a regular child of an immutable.
 
 ;;; Used for mutable bindings.
-;;; These are not Burke objects, so it is not possible for an immutable environment
+;;; These are not Hominy objects, so it is not possible for an immutable environment
 ;;; to hold cells.
 (defstruct (cell (:constructor make-cell (value))
                  (:predicate cellp))
@@ -445,7 +445,7 @@ The function will receive two arguments, the dynamic environment and the combina
 (defclass user-class ()
   ((%nslots :initarg :nslots :reader nslots :type (integer 0))))
 
-;;; We could maaaaaybe implement these more efficiently by having each Burke
+;;; We could maaaaaybe implement these more efficiently by having each Hominy
 ;;; class use a Lisp defstruct - avoid the indirect vector that way.
 ;;; But like who cares, man.
 (defstruct (object (:constructor make-object

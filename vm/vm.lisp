@@ -1,4 +1,4 @@
-(in-package #:burke/vm)
+(in-package #:hominy/vm)
 
 (defun decode (byte)
   (first (member byte o:*ops* :key #'second)))

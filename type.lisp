@@ -1,4 +1,4 @@
-(in-package #:burke/type)
+(in-package #:hominy/type)
 
 ;;; Simple type mechanism with total subtypep.
 ;;; Open world (no disjunction is ever top)

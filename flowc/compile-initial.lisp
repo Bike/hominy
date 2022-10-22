@@ -1,4 +1,4 @@
-(in-package #:burke)
+(in-package #:hominy)
 
 #|
 ($vau (x . y) e form)
@@ -131,15 +131,15 @@ Now lower stages can do things like figure out an efficient lookup and calling c
 ;;; The enclosed data is (static-env ptree eparam . body).
 
 (defun fresh-function (&optional fname)
-  (burke/ir:assemble ((f fname) enclosed return)
+  (hominy/ir:assemble ((f fname) enclosed return)
     (start (combinand.dynenv)
      ()
-     (:= static-env (burke/ir:car enclosed))
-     (:= t0 (burke/ir:cdr enclosed))
-     (:= ptree (burke/ir:car t0))
-     (:= t1 (burke/ir:cdr t0))
-     (:= eparam (burke/ir:car t1))
-     (:= body (burke/ir:cdr t1))
-     (:= aptree (burke/ir:cons ptree eparam))
-     (:= env (burke/ir:augment static-env aptree combinand.dynenv))
-     (burke/ir:sequence return body env))))
+     (:= static-env (hominy/ir:car enclosed))
+     (:= t0 (hominy/ir:cdr enclosed))
+     (:= ptree (hominy/ir:car t0))
+     (:= t1 (hominy/ir:cdr t0))
+     (:= eparam (hominy/ir:car t1))
+     (:= body (hominy/ir:cdr t1))
+     (:= aptree (hominy/ir:cons ptree eparam))
+     (:= env (hominy/ir:augment static-env aptree combinand.dynenv))
+     (hominy/ir:sequence return body env))))

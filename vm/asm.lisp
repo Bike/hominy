@@ -1,4 +1,4 @@
-(in-package #:burke/vm/asm)
+(in-package #:hominy/vm/asm)
 
 ;;; A module being compiled.
 (defclass cmodule ()
@@ -62,7 +62,7 @@
   (push inst (cfunctions cmodule))
   ;; Put in a default name if none was provided.
   (unless namep
-    (setf (name inst) `(burke/interpreter/syms::$vau ,(ptree inst) ,(eparam inst)))))
+    (setf (name inst) `(hominy/interpreter/syms::$vau ,(ptree inst) ,(eparam inst)))))
 
 (defun closure-index (cfunction thing)
   (or (position thing (closed cfunction))

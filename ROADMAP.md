@@ -10,7 +10,7 @@ All these compilers can share info structures, compiler environments, the VM def
 
 Now treec is working on basic code. I do still want to ultimately do the flow compiler, but I should also think about what I want to do and what I need to do it.
 
-My fundamental goal is to have a testbed language with very simple language semantics that I can use to facilitate my thinking about compilers and programming languages. To this end I would actually like something that could be usable as a daily driver, because I think the simple abstractions alone are not enough to understand how a programming language can be used - as a basic example, I have Burke "working" as I write this, but there is no arithmetic: a subsystem that most serious programs would involve (for example, the VM and compilers I have written in CL do), and a subsystem whose optimization is a vastly complex problem on its own.
+My fundamental goal is to have a testbed language with very simple language semantics that I can use to facilitate my thinking about compilers and programming languages. To this end I would actually like something that could be usable as a daily driver, because I think the simple abstractions alone are not enough to understand how a programming language can be used - as a basic example, I have Hominy "working" as I write this, but there is no arithmetic: a subsystem that most serious programs would involve (for example, the VM and compilers I have written in CL do), and a subsystem whose optimization is a vastly complex problem on its own.
 
 Anyway, quick TODO list, in no order:
 
@@ -57,7 +57,7 @@ Anyway, quick TODO list, in no order:
  - X static binding (i.e. the report's "gensyms")
   - X convenient macrology (e.g. once-only)
  - X macros
-  - X expose to Burke
+  - X expose to Hominy
  - types (in CL/optimizer sense, not data types)
  - X type definition
   - X generalize encapsulated types to hold multiple objects directly (more efficient i hope)

@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 ;;;; FIXME: Code duplication
 ;;;; Also this is all pretty inefficient.

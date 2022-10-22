@@ -1,4 +1,4 @@
-(in-package #:burke/flow)
+(in-package #:hominy/flow)
 
 (defgeneric compute-info (datum)
   (:method ((user ir:datum)) (info:default-info)))

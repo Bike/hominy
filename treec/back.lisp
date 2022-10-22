@@ -1,4 +1,4 @@
-(in-package #:burke/treec)
+(in-package #:hominy/treec)
 
 (defvar *regs-hwm*) ; how many locals have we used?
 (defvar *stack-hwm*) ; and how much stack?

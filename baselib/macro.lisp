@@ -1,4 +1,4 @@
-(in-package #:burke/baselib)
+(in-package #:hominy/baselib)
 
 (defclass macro (i:operative)
   ((%expander :initarg :expander :reader expander :accessor %expander :type i:combiner)))

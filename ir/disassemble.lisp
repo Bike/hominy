@@ -1,4 +1,4 @@
-(in-package #:burke/ir)
+(in-package #:hominy/ir)
 
 ;;;; Note that we don't use the linearization here. This is because
 ;;;; a) i wrote this disassembler before the linearizer, and
