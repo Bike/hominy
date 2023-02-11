@@ -1,4 +1,4 @@
-This is an implementation of a language resembling [https://web.cs.wpi.edu/~jshutt/kernel.html](Kernel). The implementation includes an interpreter and soon a compiler.
+This is an implementation of a language resembling [Kernel](https://web.cs.wpi.edu/~jshutt/kernel.html). The implementation includes an interpreter and soon a compiler.
 
 # How to use
 
